@@ -9,7 +9,7 @@ import { StallCard } from '../components/cards/StallCard';
 export const Favorites = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'meals' | 'stalls'>('meals');
+  const [activeTab, setActiveTab] = useState('meals');
 
   // Load user's favorites from DB
   const favoriteMeals = useMemo(() => {

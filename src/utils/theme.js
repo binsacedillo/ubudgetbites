@@ -1,14 +1,4 @@
-export interface CampusStyle {
-  bg: string;
-  text: string;
-  border: string;
-  hoverBg: string;
-  ring: string;
-  shadow: string;
-  badge: string; // Style for small tags/badges
-}
-
-export const getCampusStyle = (campusId: string): CampusStyle => {
+export const getCampusStyle = (campusId) => {
   switch (campusId) {
     case 'ust':
       return {

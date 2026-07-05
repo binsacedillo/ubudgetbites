@@ -1,5 +1,4 @@
 import { CAMPUSES, FOOD_STALLS, MEALS, REVIEWS } from '../constants';
-import type { Campus, FoodStall, Meal, Review, Contribution } from '../types';
 
 // Storage keys
 const KEY_MEALS = 'ub_meals';
@@ -19,7 +18,7 @@ export function initializeDB() {
     localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
   }
   if (!localStorage.getItem(KEY_CONTRIBUTIONS)) {
-    const defaultContributions: Contribution[] = [
+    const defaultContributions = [
       {
         id: 'c1',
         userId: 'u1',
@@ -45,50 +44,50 @@ export function initializeDB() {
 initializeDB();
 
 // Helper to read storage
-function readStorage<T>(key: string): T[] {
+function readStorage(key) {
   const data = localStorage.getItem(key);
   return data ? JSON.parse(data) : [];
 }
 
 // Helper to write storage
-function writeStorage<T>(key: string, data: T[]): void {
+function writeStorage(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 
 export const dbService = {
   // Campuses (static)
-  getCampuses(): Campus[] {
+  getCampuses() {
     return CAMPUSES;
   },
 
-  getCampusById(id: string): Campus | undefined {
+  getCampusById(id) {
     return CAMPUSES.find(c => c.id === id);
   },
 
   // Meals
-  getMeals(): Meal[] {
-    return readStorage<Meal>(KEY_MEALS);
+  getMeals() {
+    return readStorage(KEY_MEALS);
   },
 
-  getMealById(id: string): Meal | undefined {
+  getMealById(id) {
     return this.getMeals().find(m => m.id === id);
   },
 
-  getMealsByCampus(campusId: string): Meal[] {
+  getMealsByCampus(campusId) {
     return this.getMeals().filter(m => m.campusId === campusId);
   },
 
-  addMeal(meal: Omit<Meal, 'id' | 'rating' | 'reviewsCount' | 'lastUpdated' | 'tags'> & { id?: string }): Meal {
+  addMeal(meal) {
     const meals = this.getMeals();
     
     // Determine budget tags based on price
-    const tags: Meal['tags'] = [];
+    const tags = [];
     if (meal.price < 50) tags.push('under-50');
     else if (meal.price <= 75) tags.push('50-75');
     else if (meal.price <= 100) tags.push('75-100');
     else tags.push('above-100');
 
-    const newMeal: Meal = {
+    const newMeal = {
       ...meal,
       id: meal.id || `meal-${Date.now()}`,
       rating: 5.0, // default new meal rating
@@ -111,7 +110,7 @@ export const dbService = {
     return newMeal;
   },
 
-  updateMealPrice(mealId: string, newPrice: number, userId: string, userName: string): Meal | undefined {
+  updateMealPrice(mealId, newPrice, userId, userName) {
     const meals = this.getMeals();
     const idx = meals.findIndex(m => m.id === mealId);
     if (idx === -1) return undefined;
@@ -121,7 +120,7 @@ export const dbService = {
     meals[idx].lastUpdated = new Date().toISOString();
     
     // Recalculate tags
-    const tags: Meal['tags'] = [];
+    const tags = [];
     if (newPrice < 50) tags.push('under-50');
     else if (newPrice <= 75) tags.push('50-75');
     else if (newPrice <= 100) tags.push('75-100');
@@ -142,21 +141,21 @@ export const dbService = {
   },
 
   // Food Stalls
-  getStalls(): FoodStall[] {
-    return readStorage<FoodStall>(KEY_STALLS);
+  getStalls() {
+    return readStorage(KEY_STALLS);
   },
 
-  getStallById(id: string): FoodStall | undefined {
+  getStallById(id) {
     return this.getStalls().find(s => s.id === id);
   },
 
-  getStallsByCampus(campusId: string): FoodStall[] {
+  getStallsByCampus(campusId) {
     return this.getStalls().filter(s => s.campusId === campusId);
   },
 
-  addStall(stall: Omit<FoodStall, 'id' | 'rating' | 'reviewsCount' | 'menuItemIds'> & { id?: string }): FoodStall {
+  addStall(stall) {
     const stalls = this.getStalls();
-    const newStall: FoodStall = {
+    const newStall = {
       ...stall,
       id: stall.id || `stall-${Date.now()}`,
       rating: 5.0,
@@ -169,15 +168,15 @@ export const dbService = {
   },
 
   // Reviews
-  getReviews(targetId: string, targetType: 'meal' | 'stall'): Review[] {
-    return readStorage<Review>(KEY_REVIEWS).filter(
+  getReviews(targetId, targetType) {
+    return readStorage(KEY_REVIEWS).filter(
       r => r.targetId === targetId && r.targetType === targetType
     );
   },
 
-  addReview(review: Omit<Review, 'id' | 'createdAt'> & { id?: string }): Review {
-    const reviews = readStorage<Review>(KEY_REVIEWS);
-    const newReview: Review = {
+  addReview(review) {
+    const reviews = readStorage(KEY_REVIEWS);
+    const newReview = {
       ...review,
       id: review.id || `rev-${Date.now()}`,
       createdAt: new Date().toISOString()
@@ -240,19 +239,19 @@ export const dbService = {
   },
 
   // Contributions
-  getContributions(): Contribution[] {
-    return readStorage<Contribution>(KEY_CONTRIBUTIONS).sort(
+  getContributions() {
+    return readStorage(KEY_CONTRIBUTIONS).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   },
 
-  getContributionsByUser(userId: string): Contribution[] {
+  getContributionsByUser(userId) {
     return this.getContributions().filter(c => c.userId === userId);
   },
 
-  addContribution(contribution: Omit<Contribution, 'id' | 'createdAt'>): Contribution {
+  addContribution(contribution) {
     const list = this.getContributions();
-    const newContrib: Contribution = {
+    const newContrib = {
       ...contribution,
       id: `contrib-${Date.now()}`,
       createdAt: new Date().toISOString()
@@ -270,7 +269,7 @@ export const dbService = {
         
         // Also update in registered users list
         const users = JSON.parse(localStorage.getItem('ub_users') || '[]');
-        const uIdx = users.findIndex((u: any) => u.id === user.id);
+        const uIdx = users.findIndex((u) => u.id === user.id);
         if (uIdx !== -1) {
           users[uIdx].contributionsCount = user.contributionsCount;
           localStorage.setItem('ub_users', JSON.stringify(users));

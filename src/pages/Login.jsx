@@ -48,7 +48,7 @@ export const Login = () => {
     resolver: zodResolver(registerSchema)
   });
 
-  const onLogin = (data: any) => {
+  const onLogin = (data) => {
     const success = login(data.email);
     if (success) {
       showToast('Successfully logged in!', 'success');
@@ -58,7 +58,7 @@ export const Login = () => {
     }
   };
 
-  const onRegister = (data: any) => {
+  const onRegister = (data) => {
     register(data.name, data.email, data.campus);
     showToast('Registration successful! Welcome!', 'success');
     navigate(-1); // Back to previous page
@@ -99,7 +99,7 @@ export const Login = () => {
                 />
               </div>
               {loginErrors.email && (
-                <span className="text-xs text-rose-500 font-semibold">{loginErrors.email.message as string}</span>
+                <span className="text-xs text-rose-500 font-semibold">{loginErrors.email.message}</span>
               )}
             </div>
 
@@ -128,7 +128,7 @@ export const Login = () => {
                 />
               </div>
               {registerErrors.name && (
-                <span className="text-xs text-rose-500 font-semibold">{registerErrors.name.message as string}</span>
+                <span className="text-xs text-rose-500 font-semibold">{registerErrors.name.message}</span>
               )}
             </div>
 
@@ -147,7 +147,7 @@ export const Login = () => {
                 />
               </div>
               {registerErrors.email && (
-                <span className="text-xs text-rose-500 font-semibold">{registerErrors.email.message as string}</span>
+                <span className="text-xs text-rose-500 font-semibold">{registerErrors.email.message}</span>
               )}
             </div>
 
@@ -171,7 +171,7 @@ export const Login = () => {
                 </select>
               </div>
               {registerErrors.campus && (
-                <span className="text-xs text-rose-500 font-semibold">{registerErrors.campus.message as string}</span>
+                <span className="text-xs text-rose-500 font-semibold">{registerErrors.campus.message}</span>
               )}
             </div>
 

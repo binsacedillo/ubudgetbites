@@ -66,7 +66,7 @@ export const Profile = () => {
     navigate('/');
   };
 
-  const onAddMeal = (data: any) => {
+  const onAddMeal = (data) => {
     const selectedStall = stalls.find(s => s.id === data.stallId);
     if (!selectedStall) {
       showToast('Stall not found', 'error');
@@ -238,7 +238,7 @@ export const Profile = () => {
                   className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 outline-none focus:border-orange-400 transition-colors"
                 />
                 {mealErrors.name && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.name.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.name.message}</span>
                 )}
               </div>
 
@@ -255,7 +255,7 @@ export const Profile = () => {
                   />
                 </div>
                 {mealErrors.price && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.price.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.price.message}</span>
                 )}
               </div>
 
@@ -274,7 +274,7 @@ export const Profile = () => {
                   ))}
                 </select>
                 {mealErrors.campusId && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.campusId.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.campusId.message}</span>
                 )}
               </div>
 
@@ -293,7 +293,7 @@ export const Profile = () => {
                   ))}
                 </select>
                 {mealErrors.category && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.category.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.category.message}</span>
                 )}
               </div>
 
@@ -312,7 +312,7 @@ export const Profile = () => {
                   ))}
                 </select>
                 {mealErrors.stallId && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.stallId.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.stallId.message}</span>
                 )}
               </div>
 
@@ -326,7 +326,7 @@ export const Profile = () => {
                   className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 outline-none focus:border-orange-400 resize-none"
                 />
                 {mealErrors.description && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.description.message as string}</span>
+                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.description.message}</span>
                 )}
               </div>
 

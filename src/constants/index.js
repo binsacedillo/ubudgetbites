@@ -1,6 +1,4 @@
-import type { Campus, FoodStall, Meal, Review } from '../types';
-
-export const CAMPUSES: Campus[] = [
+export const CAMPUSES = [
   { id: 'ust', name: 'UST', fullName: 'University of Santo Tomas', location: 'España Blvd, Sampaloc, Manila' },
   { id: 'feu', name: 'FEU', fullName: 'Far Eastern University', location: 'Nicanor Reyes St, Sampaloc, Manila' },
   { id: 'ue', name: 'UE', fullName: 'University of the East', location: 'Claro M. Recto Ave, Sampaloc, Manila' },
@@ -24,7 +22,7 @@ export const BUDGET_TIERS = [
   { id: 'above-100', label: 'Above ₱100', min: 100 }
 ];
 
-export const FOOD_STALLS: FoodStall[] = [
+export const FOOD_STALLS = [
   {
     id: 'ang-kong',
     name: 'Angkong Dimsum House',
@@ -132,7 +130,7 @@ export const FOOD_STALLS: FoodStall[] = [
   }
 ];
 
-export const MEALS: Meal[] = [
+export const MEALS = [
   {
     id: 'angkong-siomai-pork',
     name: 'Pork Siomai Rice (4 pcs)',
@@ -375,7 +373,7 @@ export const MEALS: Meal[] = [
   }
 ];
 
-export const REVIEWS: Review[] = [
+export const REVIEWS = [
   {
     id: 'r1',
     userId: 'u1',

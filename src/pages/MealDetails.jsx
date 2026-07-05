@@ -1,27 +1,25 @@
 import { useState, useMemo } from 'react';
-import type { FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Heart, MessageSquare, Plus, RefreshCw, Check } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { RatingStars } from '../components/ui/RatingStars';
-import type { Review } from '../types';
 import { getCampusStyle } from '../utils/theme';
 
 export const MealDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user, toggleFavorite, isFavorite } = useAuth();
   const { showToast } = useToast();
 
   // Load from dbService
   const [meal, setMeal] = useState(() => dbService.getMealById(id || ''));
-  const [reviews, setReviews] = useState<Review[]>(() => dbService.getReviews(id || '', 'meal'));
+  const [reviews, setReviews] = useState(() => dbService.getReviews(id || '', 'meal'));
 
   // Form states
-  const [newPrice, setNewPrice] = useState<string>('');
-  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [newPrice, setNewPrice] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewBudgetFeedback, setReviewBudgetFeedback] = useState('');
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -55,7 +53,7 @@ export const MealDetails = () => {
     );
   };
 
-  const handlePriceUpdate = (e: FormEvent) => {
+  const handlePriceUpdate = (e) => {
     e.preventDefault();
     if (!user) {
       showToast('Please login to submit price updates!', 'info');
@@ -78,7 +76,7 @@ export const MealDetails = () => {
     }
   };
 
-  const handleReviewSubmit = (e: FormEvent) => {
+  const handleReviewSubmit = (e) => {
     e.preventDefault();
     if (!user) {
       showToast('Please login to submit reviews!', 'info');
@@ -117,7 +115,7 @@ export const MealDetails = () => {
     showToast('Thank you for contributing a review!', 'success');
   };
 
-  const formattedDate = (dateStr: string) => {
+  const formattedDate = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };

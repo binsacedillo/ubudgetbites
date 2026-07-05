@@ -1,17 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { Heart, Clock, AlertCircle } from 'lucide-react';
-import type { Meal } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { RatingStars } from '../ui/RatingStars';
 import { dbService } from '../../services/db';
 import { getCampusStyle } from '../../utils/theme';
 
-interface FoodCardProps {
-  meal: Meal;
-}
-
-export const FoodCard = ({ meal }: FoodCardProps) => {
+export const FoodCard = ({ meal }) => {
   const navigate = useNavigate();
   const { user, toggleFavorite, isFavorite } = useAuth();
   const { showToast } = useToast();
@@ -20,7 +15,7 @@ export const FoodCard = ({ meal }: FoodCardProps) => {
   const stall = dbService.getStallById(meal.stallId);
   const campusName = dbService.getCampusById(meal.campusId)?.name || meal.campusId;
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFavoriteClick = (e) => {
     e.stopPropagation();
     if (!user) {
       showToast('Please login to save favorites!', 'info');
@@ -34,7 +29,7 @@ export const FoodCard = ({ meal }: FoodCardProps) => {
     );
   };
 
-  const formattedDate = (dateStr: string) => {
+  const formattedDate = (dateStr) => {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };

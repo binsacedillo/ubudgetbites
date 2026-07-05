@@ -8,7 +8,7 @@ import { RatingStars } from '../components/ui/RatingStars';
 import { getCampusStyle } from '../utils/theme';
 
 export const StallDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user, toggleFavorite, isFavorite } = useAuth();
   const { showToast } = useToast();

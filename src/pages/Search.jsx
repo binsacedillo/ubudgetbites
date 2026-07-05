@@ -1,14 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Search as SearchIcon, MapPin, Store, Utensils, XCircle } from 'lucide-react';
 import { dbService } from '../services/db';
 import { CAMPUSES } from '../constants';
 import { FoodCard } from '../components/cards/FoodCard';
 import { StallCard } from '../components/cards/StallCard';
 
-export const Search: React.FC = () => {
+export const Search = () => {
   const [query, setQuery] = useState('');
   const [campusFilter, setCampusFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState<'meals' | 'stalls'>('meals');
+  const [activeTab, setActiveTab] = useState('meals');
 
   const meals = useMemo(() => dbService.getMeals(), []);
   const stalls = useMemo(() => dbService.getStalls(), []);

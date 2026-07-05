@@ -12,9 +12,9 @@ export const Home = () => {
   const { user } = useAuth();
   
   // States
-  const [selectedCampus, setSelectedCampus] = useState<string>('ust'); // Default to UST for demo
-  const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCampus, setSelectedCampus] = useState('ust'); // Default to UST for demo
+  const [selectedBudget, setSelectedBudget] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   // Fetch all meals and active filter checks
   const meals = useMemo(() => dbService.getMeals(), []);

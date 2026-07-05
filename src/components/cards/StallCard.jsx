@@ -1,17 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Clock, ArrowRight, Heart } from 'lucide-react';
-import type { FoodStall } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { RatingStars } from '../ui/RatingStars';
 import { dbService } from '../../services/db';
 import { getCampusStyle } from '../../utils/theme';
 
-interface StallCardProps {
-  stall: FoodStall;
-}
-
-export const StallCard = ({ stall }: StallCardProps) => {
+export const StallCard = ({ stall }) => {
   const navigate = useNavigate();
   const { user, toggleFavorite, isFavorite } = useAuth();
   const { showToast } = useToast();
@@ -19,7 +14,7 @@ export const StallCard = ({ stall }: StallCardProps) => {
   const favorited = isFavorite(stall.id, 'stall');
   const campus = dbService.getCampusById(stall.campusId);
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFavoriteClick = (e) => {
     e.stopPropagation();
     if (!user) {
       showToast('Please login to save favorites!', 'info');

@@ -1,30 +1,22 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 
-interface RatingStarsProps {
-  rating: number;
-  max?: number;
-  size?: number;
-  onChange?: (rating: number) => void;
-  interactive?: boolean;
-}
-
-export const RatingStars: React.FC<RatingStarsProps> = ({
+export const RatingStars = ({
   rating,
   max = 5,
   size = 16,
   onChange,
   interactive = false
 }) => {
-  const [hoverRating, setHoverRating] = React.useState<number | null>(null);
+  const [hoverRating, setHoverRating] = React.useState(null);
 
-  const handleClick = (value: number) => {
+  const handleClick = (value) => {
     if (interactive && onChange) {
       onChange(value);
     }
   };
 
-  const handleMouseEnter = (value: number) => {
+  const handleMouseEnter = (value) => {
     if (interactive) {
       setHoverRating(value);
     }

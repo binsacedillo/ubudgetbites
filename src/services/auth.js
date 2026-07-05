@@ -1,12 +1,10 @@
-import type { User } from '../types';
-
 const KEY_USERS = 'ub_users';
 const KEY_SESSION = 'ub_user_session';
 
 // Initialize default users if empty
 function initializeUsers() {
   if (!localStorage.getItem(KEY_USERS)) {
-    const defaultUsers: User[] = [
+    const defaultUsers = [
       {
         id: 'u1',
         name: 'Juan Dela Cruz',
@@ -33,23 +31,23 @@ function initializeUsers() {
 initializeUsers();
 
 export const authService = {
-  getCurrentUser(): User | null {
+  getCurrentUser() {
     const session = localStorage.getItem(KEY_SESSION);
     return session ? JSON.parse(session) : null;
   },
 
-  register(name: string, email: string, campus: string): User {
+  register(name, email, campus) {
     const users = JSON.parse(localStorage.getItem(KEY_USERS) || '[]');
     
     // Check if user already exists
-    const existing = users.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
+    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
       // Just log them in if they already exist, for ease of demo
       localStorage.setItem(KEY_SESSION, JSON.stringify(existing));
       return existing;
     }
 
-    const newUser: User = {
+    const newUser = {
       id: `u-${Date.now()}`,
       name,
       email,
@@ -65,9 +63,9 @@ export const authService = {
     return newUser;
   },
 
-  login(email: string): User | null {
+  login(email) {
     const users = JSON.parse(localStorage.getItem(KEY_USERS) || '[]');
-    const user = users.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
+    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     
     if (user) {
       localStorage.setItem(KEY_SESSION, JSON.stringify(user));
@@ -87,13 +85,13 @@ export const authService = {
     return this.register(mockName || 'Student Pitcher', email, campus);
   },
 
-  logout(): void {
+  logout() {
     localStorage.removeItem(KEY_SESSION);
   },
 
-  toggleFavorite(userId: string, targetId: string, type: 'meal' | 'stall'): { meals: string[], stalls: string[] } {
+  toggleFavorite(userId, targetId, type) {
     const users = JSON.parse(localStorage.getItem(KEY_USERS) || '[]');
-    const uIdx = users.findIndex((u: User) => u.id === userId);
+    const uIdx = users.findIndex((u) => u.id === userId);
     
     if (uIdx === -1) return { meals: [], stalls: [] };
     

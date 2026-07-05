@@ -1,21 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User } from '../types';
 import { authService } from '../services/auth';
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (email: string) => boolean;
-  register: (name: string, email: string, campus: string) => void;
-  logout: () => void;
-  toggleFavorite: (targetId: string, type: 'meal' | 'stall') => void;
-  isFavorite: (targetId: string, type: 'meal' | 'stall') => boolean;
-}
+const AuthContext = createContext(undefined);
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +13,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = (email: string): boolean => {
+  const login = (email) => {
     const loggedUser = authService.login(email);
     if (loggedUser) {
       setUser(loggedUser);
@@ -33,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const register = (name: string, email: string, campus: string) => {
+  const register = (name, email, campus) => {
     const newUser = authService.register(name, email, campus);
     setUser(newUser);
   };
@@ -43,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const toggleFavorite = (targetId: string, type: 'meal' | 'stall') => {
+  const toggleFavorite = (targetId, type) => {
     if (!user) return;
     const updatedFavorites = authService.toggleFavorite(user.id, targetId, type);
     setUser({
@@ -52,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const isFavorite = (targetId: string, type: 'meal' | 'stall'): boolean => {
+  const isFavorite = (targetId, type) => {
     if (!user || !user.favorites) return false;
     const list = type === 'meal' ? user.favorites.meals : user.favorites.stalls;
     return list ? list.includes(targetId) : false;
