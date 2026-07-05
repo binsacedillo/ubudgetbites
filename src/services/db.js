@@ -5,19 +5,20 @@ const KEY_MEALS = 'ub_meals';
 const KEY_STALLS = 'ub_stalls';
 const KEY_REVIEWS = 'ub_reviews';
 const KEY_CONTRIBUTIONS = 'ub_contributions';
+const KEY_DB_VERSION = 'ub_db_version';
+const CURRENT_DB_VERSION = 'v4'; // Increment to force-reset and sync constants
 
 // Initialize default data if not present in localStorage
 export function initializeDB() {
-  if (!localStorage.getItem(KEY_MEALS)) {
+  const storedVersion = localStorage.getItem(KEY_DB_VERSION);
+  
+  if (storedVersion !== CURRENT_DB_VERSION) {
+    // Reset database to sync with constants changes
     localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
-  }
-  if (!localStorage.getItem(KEY_STALLS)) {
     localStorage.setItem(KEY_STALLS, JSON.stringify(FOOD_STALLS));
-  }
-  if (!localStorage.getItem(KEY_REVIEWS)) {
     localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
-  }
-  if (!localStorage.getItem(KEY_CONTRIBUTIONS)) {
+    localStorage.setItem(KEY_DB_VERSION, CURRENT_DB_VERSION);
+    
     const defaultContributions = [
       {
         id: 'c1',
@@ -37,6 +38,18 @@ export function initializeDB() {
       }
     ];
     localStorage.setItem(KEY_CONTRIBUTIONS, JSON.stringify(defaultContributions));
+    return;
+  }
+
+  // Fallbacks in case individual keys were cleared
+  if (!localStorage.getItem(KEY_MEALS)) {
+    localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
+  }
+  if (!localStorage.getItem(KEY_STALLS)) {
+    localStorage.setItem(KEY_STALLS, JSON.stringify(FOOD_STALLS));
+  }
+  if (!localStorage.getItem(KEY_REVIEWS)) {
+    localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
   }
 }
 

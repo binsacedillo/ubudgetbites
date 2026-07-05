@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, Search, Heart, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Logo } from '../ui/Logo';
 
 export const Navbar = () => {
   const { user } = useAuth();
@@ -17,16 +18,11 @@ export const Navbar = () => {
     <>
       {/* Desktop Header */}
       <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 px-6 py-3.5 hidden md:flex items-center justify-between">
-        <div className="flex items-center gap-2.5 cursor-pointer select-none" onClick={() => navigate('/')}>
-          <span className="text-2xl" role="img" aria-label="noodle bowl">🍜</span>
-          <div>
-            <span className="font-semibold text-base tracking-tight text-gray-900 block">
-              U-BudgetBites
-            </span>
-            <span className="block text-[11px] text-gray-400 font-medium">
-              Affordable food around U-Belt
-            </span>
-          </div>
+        <div 
+          className="cursor-pointer select-none" 
+          onClick={() => navigate('/')}
+        >
+          <Logo size={36} showTagline={true} />
         </div>
 
         <nav className="flex items-center gap-6">
@@ -72,11 +68,11 @@ export const Navbar = () => {
 
       {/* Mobile Top App Bar */}
       <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 px-4 py-3 flex md:hidden items-center justify-between">
-        <div className="flex items-center gap-2 select-none" onClick={() => navigate('/')}>
-          <span className="text-xl" role="img" aria-label="noodle bowl">🍜</span>
-          <span className="font-semibold text-base text-gray-900 tracking-tight">
-            U-BudgetBites
-          </span>
+        <div 
+          className="cursor-pointer select-none" 
+          onClick={() => navigate('/')}
+        >
+          <Logo size={28} showTagline={false} />
         </div>
         {user ? (
           <div 

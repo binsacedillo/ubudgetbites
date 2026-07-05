@@ -1,3 +1,9 @@
+import siomaiRiceImg from '../assets/steamed_pork_siomai_rice.png';
+import lugawWithEggImg from '../assets/special_lugaw_with_egg.png';
+import sizzlingBurgerSteakImg from '../assets/sizzling_burger_steak.png';
+import crispyChickenRiceImg from '../assets/crispy_chicken_rice.png';
+import dimsumTreatsStallImg from '../assets/dimsum_treats_stall.png';
+
 export const CAMPUSES = [
   { id: 'ust', name: 'UST', fullName: 'University of Santo Tomas', location: 'España Blvd, Sampaloc, Manila' },
   { id: 'feu', name: 'FEU', fullName: 'Far Eastern University', location: 'Nicanor Reyes St, Sampaloc, Manila' },
@@ -61,7 +67,7 @@ export const FOOD_STALLS = [
     distance: '5 mins walk',
     distanceMeters: 300,
     categories: ['Rice Meals', 'Snacks & Street Food'],
-    image: 'https://images.unsplash.com/photo-1496116211227-7d3ccb8f4b74?w=600&auto=format&fit=crop&q=80',
+    image: dimsumTreatsStallImg,
     rating: 4.5,
     reviewsCount: 84,
     googleMapsUrl: 'https://maps.google.com/?q=Dimsum+Treats+Dapitan+UST',
@@ -127,6 +133,36 @@ export const FOOD_STALLS = [
     googleMapsUrl: 'https://maps.google.com/?q=San+Beda+University+Mendiola+Manila',
     openingHours: '8:00 AM - 6:00 PM',
     menuItemIds: ['beda-red-sisig', 'beda-red-chix']
+  },
+  {
+    id: 'ue-sizzling',
+    name: 'Gastambide Sizzling & Grill',
+    description: 'Popular among UE Warriors for affordable sizzling plates with unlimited gravy.',
+    campusId: 'ue',
+    distance: '3 mins walk',
+    distanceMeters: 180,
+    categories: ['Rice Meals'],
+    image: sizzlingBurgerSteakImg,
+    rating: 4.5,
+    reviewsCount: 42,
+    googleMapsUrl: 'https://maps.google.com/?q=Gastambide+Street+UE+Manila',
+    openingHours: '9:00 AM - 9:00 PM',
+    menuItemIds: ['ue-burger-steak']
+  },
+  {
+    id: 'nu-chicken',
+    name: 'Jhocson Crispy Chicken',
+    description: 'Huge crispy chicken wings served with rich gravy and java rice, a favorite of NU Bulldogs.',
+    campusId: 'nu',
+    distance: '2 mins walk',
+    distanceMeters: 100,
+    categories: ['Rice Meals'],
+    image: crispyChickenRiceImg,
+    rating: 4.6,
+    reviewsCount: 57,
+    googleMapsUrl: 'https://maps.google.com/?q=Jhocson+Street+NU+Manila',
+    openingHours: '8:30 AM - 8:00 PM',
+    menuItemIds: ['nu-chicken-rice']
   }
 ];
 
@@ -230,7 +266,7 @@ export const MEALS = [
     stallName: 'Dimsum Treats',
     campusId: 'ust',
     category: 'Rice Meals',
-    image: 'https://images.unsplash.com/photo-1496116211227-7d3ccb8f4b74?w=500&auto=format&fit=crop&q=80',
+    image: siomaiRiceImg,
     rating: 4.6,
     reviewsCount: 65,
     lastUpdated: '2026-06-30T10:00:00Z',
@@ -290,7 +326,7 @@ export const MEALS = [
     stallName: "Lola Elena's Pancit & Lugawan",
     campusId: 'feu',
     category: 'Snacks & Street Food',
-    image: 'https://images.unsplash.com/photo-1594911774802-8822a707caff?w=500&auto=format&fit=crop&q=80',
+    image: lugawWithEggImg,
     rating: 4.5,
     reviewsCount: 22,
     lastUpdated: '2026-06-29T06:30:00Z',
@@ -369,6 +405,36 @@ export const MEALS = [
     rating: 4.4,
     reviewsCount: 11,
     lastUpdated: '2026-06-28T14:40:00Z',
+    tags: ['50-75']
+  },
+  {
+    id: 'ue-burger-steak',
+    name: 'Sizzling Burger Steak Rice',
+    price: 59,
+    description: 'Sizzling burger patty topped with thick mushroom gravy and toasted garlic, served with white rice.',
+    stallId: 'ue-sizzling',
+    stallName: 'Gastambide Sizzling & Grill',
+    campusId: 'ue',
+    category: 'Rice Meals',
+    image: sizzlingBurgerSteakImg,
+    rating: 4.5,
+    reviewsCount: 31,
+    lastUpdated: '2026-07-05T12:00:00Z',
+    tags: ['50-75']
+  },
+  {
+    id: 'nu-chicken-rice',
+    name: 'Giant Crispy Chicken Rice',
+    price: 65,
+    description: 'Crispy deep-fried chicken wing served with flavorful java rice and unlimited hot gravy.',
+    stallId: 'nu-chicken',
+    stallName: 'Jhocson Crispy Chicken',
+    campusId: 'nu',
+    category: 'Rice Meals',
+    image: crispyChickenRiceImg,
+    rating: 4.7,
+    reviewsCount: 48,
+    lastUpdated: '2026-07-05T12:00:00Z',
     tags: ['50-75']
   }
 ];

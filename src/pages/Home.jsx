@@ -59,7 +59,7 @@ export const Home = () => {
           Where can you eat today?
         </h1>
         <p className="text-xs text-gray-400 font-medium mt-0.5">
-          Find affordable student-approved food options near your campus.
+          Eat Smart, Spend Less. Find affordable student-approved food options near your campus.
         </p>
       </div>
 

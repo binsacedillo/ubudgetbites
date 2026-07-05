@@ -7,6 +7,7 @@ import { Mail, User, GraduationCap, UtensilsCrossed } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { CAMPUSES } from '../constants';
+import { Logo } from '../components/ui/Logo';
 
 const loginSchema = zod.object({
   email: zod.string().email('Please enter a valid student email address')
@@ -68,17 +69,15 @@ export const Login = () => {
     <div className="pb-24 pt-12 px-4 flex items-center justify-center min-h-[80vh] animate-fade-in-up">
       <div className="max-w-md w-full bg-white border border-gray-100 p-8 rounded-3xl shadow-lg relative overflow-hidden">
         {/* Decor */}
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 to-orange-500" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-orange-500" />
         
-        <div className="text-center mb-8">
-          <div className="inline-flex bg-amber-50 text-amber-600 p-3 rounded-2xl mb-4">
-            <UtensilsCrossed size={28} className="stroke-[2]" />
-          </div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+        <div className="text-center mb-6 flex flex-col items-center">
+          <Logo size={56} showText={false} className="mb-3.5" />
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">
             {isRegisterMode ? 'Student Registration' : 'Student Login'}
           </h1>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">
-            U-BudgetBites Student Network
+          <p className="text-[10px] text-orange-600 font-extrabold uppercase tracking-widest mt-1">
+            Eat Smart, Spend Less.
           </p>
         </div>
 
