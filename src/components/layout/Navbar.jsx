@@ -22,7 +22,7 @@ export const Navbar = () => {
           className="cursor-pointer select-none" 
           onClick={() => navigate('/')}
         >
-          <Logo size={36} showTagline={true} />
+          <Logo size={42} showTagline={true} />
         </div>
 
         <nav className="flex items-center gap-6">
@@ -72,7 +72,7 @@ export const Navbar = () => {
           className="cursor-pointer select-none" 
           onClick={() => navigate('/')}
         >
-          <Logo size={28} showTagline={false} />
+          <Logo size={34} showTagline={false} />
         </div>
         {user ? (
           <div 

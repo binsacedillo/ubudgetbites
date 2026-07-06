@@ -28,8 +28,8 @@ export const Logo = ({
             <stop offset="100%" stopColor="#991B1B" />
           </linearGradient>
           <linearGradient id="mapGradient" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#F8FAFC" />
-            <stop offset="100%" stopColor="#E2E8F0" />
+            <stop offset="0%" stopColor="#FFFBEB" /> {/* Warm light cream */}
+            <stop offset="100%" stopColor="#F5E0B3" /> {/* Warm tan/sand */}
           </linearGradient>
         </defs>
 
@@ -40,10 +40,10 @@ export const Logo = ({
           rx="52" 
           ry="15" 
           fill="none" 
-          stroke="#F59E0B" 
-          strokeWidth="1.2" 
+          stroke="#D97706" 
+          strokeWidth="1.8" 
           transform="rotate(-15 60 60)" 
-          opacity="0.85"
+          opacity="0.9"
         />
         <ellipse 
           cx="60" 
@@ -51,39 +51,39 @@ export const Logo = ({
           rx="46" 
           ry="12" 
           fill="none" 
-          stroke="#FBBF24" 
-          strokeWidth="1.2" 
+          stroke="#F59E0B" 
+          strokeWidth="1.8" 
           transform="rotate(15 60 60)" 
-          opacity="0.7"
+          opacity="0.8"
         />
 
         {/* Perspective Folded Map */}
         <polygon 
           points="25,65 85,50 98,85 35,100" 
           fill="url(#mapGradient)" 
-          stroke="#94A3B8" 
-          strokeWidth="1.5" 
+          stroke="#334155" 
+          strokeWidth="2.2" 
         />
         
-        {/* Map Sectors */}
-        <polygon points="25,65 55,57 60,93 35,100" fill="#D1FAE5" opacity="0.9" /> {/* Teal sector */}
-        <polygon points="55,57 85,50 98,85 60,93" fill="#FEF3C7" opacity="0.9" /> {/* Gold sector */}
+        {/* Map Sectors (Higher contrast fills) */}
+        <polygon points="25,65 55,57 60,93 35,100" fill="#6EE7B7" /> {/* Solid Emerald Green sector */}
+        <polygon points="55,57 85,50 98,85 60,93" fill="#FCD34D" /> {/* Solid Amber Gold sector */}
         
-        {/* Map Road lines */}
-        <path d="M25,65 L98,85" stroke="#F1F5F9" strokeWidth="3" />
-        <path d="M55,57 L60,93" stroke="#F1F5F9" strokeWidth="3" />
+        {/* Map Road lines (Thicker and cleaner) */}
+        <path d="M25,65 L98,85" stroke="#FFFFFF" strokeWidth="3.5" />
+        <path d="M55,57 L60,93" stroke="#FFFFFF" strokeWidth="3.5" />
         
         {/* Small pin indicators on map */}
-        <circle cx="42" cy="78" r="3" fill="#DC2626" />
-        <circle cx="80" cy="70" r="3" fill="#DC2626" />
+        <circle cx="42" cy="78" r="3.5" fill="#B91C1C" />
+        <circle cx="80" cy="70" r="3.5" fill="#B91C1C" />
 
         {/* Main Red Map Pin */}
         <path 
           d="M60,18 C47.85,18 38,27.85 38,40 C38,56.5 60,82 60,82 C60,82 82,56.5 82,40 C82,27.85 72.15,18 60,18 Z" 
           fill="url(#pinGradient)" 
           stroke="#7F1D1D" 
-          strokeWidth="0.5"
-          filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.15))"
+          strokeWidth="0.8"
+          filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.25))"
         />
 
         {/* White center circle of Red Pin */}
