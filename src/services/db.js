@@ -88,7 +88,7 @@ async function initializeDB() {
   }
 }
 
-// Timeout failsafe (2.5 seconds)
+// Timeout failsafe (4.5 seconds)
 const timeoutPromise = new Promise((resolve) => {
   setTimeout(() => {
     if (!useLocalStorageFallback) {
@@ -96,7 +96,7 @@ const timeoutPromise = new Promise((resolve) => {
       useLocalStorageFallback = true;
     }
     resolve();
-  }, 2500);
+  }, 4500);
 });
 
 export const dbReady = Promise.race([
