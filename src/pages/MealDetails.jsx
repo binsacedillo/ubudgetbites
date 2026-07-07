@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Clock, Heart, MessageSquare, Plus, RefreshCw, Check } from 'lucide-react';
 import { dbService } from '../services/db';
@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { RatingStars } from '../components/ui/RatingStars';
 import { getCampusStyle } from '../utils/theme';
+import { PriceUpdateModal } from '../components/ui/PriceUpdateModal';
+import { ReviewModal } from '../components/ui/ReviewModal';
 
 export const MealDetails = () => {
   const { id } = useParams();
@@ -14,20 +16,46 @@ export const MealDetails = () => {
   const { showToast } = useToast();
 
   // Load from dbService
-  const [meal, setMeal] = useState(() => dbService.getMealById(id || ''));
-  const [reviews, setReviews] = useState(() => dbService.getReviews(id || '', 'meal'));
+  const [meal, setMeal] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [stall, setStall] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Form states
-  const [newPrice, setNewPrice] = useState('');
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewBudgetFeedback, setReviewBudgetFeedback] = useState('');
+  // Form modals state
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
+  useEffect(() => {
+    const loadMealData = async () => {
+      setLoading(true);
+      try {
+        const fetchedMeal = await dbService.getMealById(id || '');
+        if (fetchedMeal) {
+          setMeal(fetchedMeal);
+          const [fetchedReviews, fetchedStall] = await Promise.all([
+            dbService.getReviews(fetchedMeal.id, 'meal'),
+            dbService.getStallById(fetchedMeal.stallId)
+          ]);
+          setReviews(fetchedReviews);
+          setStall(fetchedStall);
+        }
+      } catch (err) {
+        console.error("Error loading meal details:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMealData();
+  }, [id]);
+
   const favorited = isFavorite(meal?.id || '', 'meal');
-  const stall = useMemo(() => meal ? dbService.getStallById(meal.stallId) : null, [meal]);
   const campus = useMemo(() => meal ? dbService.getCampusById(meal.campusId) : null, [meal]);
+
+  if (loading) {
+    return (
+      <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto text-center shimmer rounded-2xl h-96 mt-6" />
+    );
+  }
 
   if (!meal) {
     return (
@@ -53,64 +81,60 @@ export const MealDetails = () => {
     );
   };
 
-  const handlePriceUpdate = (e) => {
-    e.preventDefault();
+  const handlePriceUpdate = async (priceVal) => {
     if (!user) {
       showToast('Please login to submit price updates!', 'info');
       navigate('/login');
       return;
     }
 
-    const priceNum = parseFloat(newPrice);
+    const priceNum = parseFloat(priceVal);
     if (isNaN(priceNum) || priceNum <= 0) {
       showToast('Please enter a valid price', 'error');
       return;
     }
 
-    const updated = dbService.updateMealPrice(meal.id, priceNum, user.id, user.name);
+    const updated = await dbService.updateMealPrice(meal.id, priceNum, user.id, user.name);
     if (updated) {
       setMeal({ ...updated });
-      setNewPrice('');
       setShowPriceModal(false);
       showToast(`Updated price to ₱${priceNum}!`, 'success');
     }
   };
 
-  const handleReviewSubmit = (e) => {
-    e.preventDefault();
+  const handleReviewSubmit = async ({ rating, comment, budgetFeedback }) => {
     if (!user) {
       showToast('Please login to submit reviews!', 'info');
       navigate('/login');
       return;
     }
 
-    if (!reviewComment.trim()) {
+    if (!comment.trim()) {
       showToast('Please write a comment', 'error');
       return;
     }
 
-    dbService.addReview({
+    await dbService.addReview({
       userId: user.id,
       userName: user.name,
       targetId: meal.id,
       targetType: 'meal',
-      rating: reviewRating,
-      comment: reviewComment,
-      budgetFeedback: reviewBudgetFeedback || `Verified ₱${meal.price} as of ${new Date().toLocaleDateString('en-US', { month: 'short' })}`
+      rating,
+      comment,
+      budgetFeedback: budgetFeedback || `Verified ₱${meal.price} as of ${new Date().toLocaleDateString('en-US', { month: 'short' })}`
     });
 
     // Refresh reviews and meal rating
-    setReviews(dbService.getReviews(meal.id, 'meal'));
+    const [fetchedReviews, updatedMeal] = await Promise.all([
+      dbService.getReviews(meal.id, 'meal'),
+      dbService.getMealById(meal.id)
+    ]);
     
-    // Refresh parent meal details
-    const updatedMeal = dbService.getMealById(meal.id);
+    setReviews(fetchedReviews);
     if (updatedMeal) {
       setMeal(updatedMeal);
     }
 
-    setReviewComment('');
-    setReviewBudgetFeedback('');
-    setReviewRating(5);
     setShowReviewModal(false);
     showToast('Thank you for contributing a review!', 'success');
   };
@@ -121,7 +145,8 @@ export const MealDetails = () => {
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto animate-fade-in-up">
+    <>
+      <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto animate-fade-in-up">
       {/* Back button */}
       <button
         onClick={() => navigate(-1)}
@@ -297,119 +322,23 @@ export const MealDetails = () => {
           </div>
         )}
       </div>
+      </div> {/* Closes animate-fade-in-up container wrapper */}
 
       {/* PRICE UPDATE DIALOG MODAL */}
-      {showPriceModal && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowPriceModal(false)} />
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm border border-gray-200 shadow-2xl relative z-10 animate-scale-in">
-            <h3 className="font-bold text-base text-gray-900 mb-1">Update price for:</h3>
-            <p className="text-xs font-bold text-orange-600 uppercase mb-4">{meal.name}</p>
-            
-            <form onSubmit={handlePriceUpdate} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase">New Price (PHP)</label>
-                <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                  <span className="font-bold text-orange-500 text-xs">₱</span>
-                  <input
-                    type="number"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    placeholder="e.g. 60"
-                    required
-                    min="1"
-                    className="bg-transparent border-none outline-none w-full text-xs font-semibold text-gray-800"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2.5 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPriceModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-lg bg-orange-500 text-white font-bold text-xs cursor-pointer"
-                >
-                  Submit Price
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PriceUpdateModal
+        isOpen={showPriceModal}
+        onClose={() => setShowPriceModal(false)}
+        mealName={meal.name}
+        onSubmit={handlePriceUpdate}
+      />
 
       {/* SUBMIT REVIEW DIALOG MODAL */}
-      {showReviewModal && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowReviewModal(false)} />
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-gray-200 shadow-2xl relative z-10 animate-scale-in">
-            <h3 className="font-bold text-base text-gray-900 mb-1">Submit Student Review</h3>
-            <p className="text-xs font-bold text-orange-600 uppercase mb-4">{meal.name}</p>
-
-            <form onSubmit={handleReviewSubmit} className="flex flex-col gap-4">
-              {/* Star Selector */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase">Your Rating</label>
-                <div className="mt-0.5">
-                  <RatingStars
-                    rating={reviewRating}
-                    interactive
-                    size={20}
-                    onChange={(r) => setReviewRating(r)}
-                  />
-                </div>
-              </div>
-
-              {/* Comment */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase">Review details</label>
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="How does it taste? Is the portion big? Is it clean?"
-                  rows={3}
-                  required
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 placeholder-gray-400 resize-none outline-none focus:border-orange-400 transition-colors"
-                />
-              </div>
-
-              {/* Price Feedback tag */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase">
-                  Price Check Tag (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={reviewBudgetFeedback}
-                  onChange={(e) => setReviewBudgetFeedback(e.target.value)}
-                  placeholder="e.g. Still ₱55 as of June"
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400 transition-colors"
-                />
-              </div>
-
-              <div className="flex gap-2.5 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowReviewModal(false)}
-                  className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-lg bg-orange-500 text-white font-bold text-xs cursor-pointer"
-                >
-                  Submit Review
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <ReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        mealName={meal.name}
+        onSubmit={handleReviewSubmit}
+      />
+    </>
   );
 };

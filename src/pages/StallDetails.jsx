@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, MapPin, Navigation, Heart, ExternalLink, UtensilsCrossed } from 'lucide-react';
 import { dbService } from '../services/db';
@@ -13,17 +13,37 @@ export const StallDetails = () => {
   const { user, toggleFavorite, isFavorite } = useAuth();
   const { showToast } = useToast();
 
-  const stall = useMemo(() => dbService.getStallById(id || ''), [id]);
-  const campus = useMemo(() => stall ? dbService.getCampusById(stall.campusId) : null, [stall]);
-  
-  // Load meals sold at this stall
-  const menuItems = useMemo(() => {
-    if (!stall) return [];
-    const allMeals = dbService.getMeals();
-    return allMeals.filter((m) => m.stallId === stall.id);
-  }, [stall]);
+  const [stall, setStall] = useState(null);
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const loadStallData = async () => {
+      setLoading(true);
+      try {
+        const fetchedStall = await dbService.getStallById(id || '');
+        if (fetchedStall) {
+          setStall(fetchedStall);
+          const allMeals = await dbService.getMeals();
+          setMenuItems(allMeals.filter((m) => m.stallId === fetchedStall.id));
+        }
+      } catch (err) {
+        console.error("Error loading stall details:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStallData();
+  }, [id]);
+
+  const campus = useMemo(() => stall ? dbService.getCampusById(stall.campusId) : null, [stall]);
   const favorited = isFavorite(stall?.id || '', 'stall');
+
+  if (loading) {
+    return (
+      <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto text-center shimmer rounded-2xl h-96 mt-6" />
+    );
+  }
 
   if (!stall) {
     return (

@@ -1,74 +1,128 @@
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  writeBatch 
+} from 'firebase/firestore';
+import { db } from './firebase';
 import { CAMPUSES, FOOD_STALLS, MEALS, REVIEWS } from '../constants';
 
-// Storage keys
+// LocalStorage Keys for fallback
 const KEY_MEALS = 'ub_meals';
 const KEY_STALLS = 'ub_stalls';
 const KEY_REVIEWS = 'ub_reviews';
 const KEY_CONTRIBUTIONS = 'ub_contributions';
-const KEY_DB_VERSION = 'ub_db_version';
-const CURRENT_DB_VERSION = 'v4'; // Increment to force-reset and sync constants
 
-// Initialize default data if not present in localStorage
-export function initializeDB() {
-  const storedVersion = localStorage.getItem(KEY_DB_VERSION);
-  
-  if (storedVersion !== CURRENT_DB_VERSION) {
-    // Reset database to sync with constants changes
-    localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
-    localStorage.setItem(KEY_STALLS, JSON.stringify(FOOD_STALLS));
-    localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
-    localStorage.setItem(KEY_DB_VERSION, CURRENT_DB_VERSION);
-    
-    const defaultContributions = [
-      {
-        id: 'c1',
-        userId: 'u1',
-        userName: 'Juan Dela Cruz',
-        type: 'price_update',
-        details: 'Verified Pork Siomai Rice is still ₱55',
-        createdAt: '2026-06-28T14:00:00Z'
-      },
-      {
-        id: 'c2',
-        userId: 'u2',
-        userName: 'Maria Santos',
-        type: 'add_review',
-        details: 'Submitted review for Bacon Bacsilog',
-        createdAt: '2026-06-30T09:30:00Z'
-      }
-    ];
-    localStorage.setItem(KEY_CONTRIBUTIONS, JSON.stringify(defaultContributions));
-    return;
-  }
+let useLocalStorageFallback = false;
 
-  // Fallbacks in case individual keys were cleared
-  if (!localStorage.getItem(KEY_MEALS)) {
-    localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
-  }
+// Helper to convert Firestore snapshots to plain arrays
+const mapSnap = (snap) => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+// LocalStorage Fallback Helpers
+function readStorage(key, defaultVal = []) {
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : defaultVal;
+}
+
+function writeStorage(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+function initializeLocalStorage() {
   if (!localStorage.getItem(KEY_STALLS)) {
     localStorage.setItem(KEY_STALLS, JSON.stringify(FOOD_STALLS));
+  }
+  if (!localStorage.getItem(KEY_MEALS)) {
+    localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
   }
   if (!localStorage.getItem(KEY_REVIEWS)) {
     localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
   }
 }
 
-// Ensure database is initialized
-initializeDB();
+// Seed database concurrently on first load if empty
+async function initializeDB() {
+  try {
+    const [stallsSnap, mealsSnap, reviewsSnap] = await Promise.all([
+      getDocs(collection(db, 'stalls')),
+      getDocs(collection(db, 'meals')),
+      getDocs(collection(db, 'reviews'))
+    ]);
+    
+    const promises = [];
+    
+    if (stallsSnap.empty) {
+      console.log('Seeding Firestore stalls...');
+      const batch = writeBatch(db);
+      FOOD_STALLS.forEach((stall) => {
+        batch.set(doc(db, 'stalls', stall.id), stall);
+      });
+      promises.push(batch.commit());
+    }
 
-// Helper to read storage
-function readStorage(key) {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
+    if (mealsSnap.empty) {
+      console.log('Seeding Firestore meals...');
+      const batch = writeBatch(db);
+      MEALS.forEach((meal) => {
+        batch.set(doc(db, 'meals', meal.id), meal);
+      });
+      promises.push(batch.commit());
+    }
+
+    if (reviewsSnap.empty) {
+      console.log('Seeding Firestore reviews...');
+      const batch = writeBatch(db);
+      REVIEWS.forEach((review) => {
+        batch.set(doc(db, 'reviews', review.id), review);
+      });
+      promises.push(batch.commit());
+    }
+
+    if (promises.length > 0) {
+      await Promise.all(promises);
+      console.log('Database successfully seeded!');
+    }
+  } catch (error) {
+    console.error('Error initializing Firestore:', error);
+    // Fallback immediately on connection/permission errors
+    useLocalStorageFallback = true;
+  }
 }
 
-// Helper to write storage
-function writeStorage(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
+// Race database ready with a 2.5 second timeout
+const timeoutPromise = new Promise((resolve) => {
+  setTimeout(() => {
+    if (loadingStateActive()) {
+      console.warn("Firebase initialization timed out. Falling back to local data storage!");
+      useLocalStorageFallback = true;
+    }
+    resolve();
+  }, 2500);
+});
+
+// Helper check to see if database was successfully loaded before timeout
+function loadingStateActive() {
+  return !useLocalStorageFallback;
 }
+
+export const dbReady = Promise.race([
+  initializeDB().then(() => {
+    // If completed successfully without throwing
+    console.log("Firebase connected successfully.");
+  }),
+  timeoutPromise
+]);
 
 export const dbService = {
-  // Campuses (static)
+  // Campuses
   getCampuses() {
     return CAMPUSES;
   },
@@ -78,22 +132,41 @@ export const dbService = {
   },
 
   // Meals
-  getMeals() {
-    return readStorage(KEY_MEALS);
+  async getMeals() {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_MEALS);
+    }
+    const snap = await getDocs(collection(db, 'meals'));
+    return mapSnap(snap);
   },
 
-  getMealById(id) {
-    return this.getMeals().find(m => m.id === id);
+  async getMealById(id) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_MEALS).find(m => m.id === id) || null;
+    }
+    const docRef = doc(db, 'meals', id);
+    const snap = await getDoc(docRef);
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
   },
 
-  getMealsByCampus(campusId) {
-    return this.getMeals().filter(m => m.campusId === campusId);
+  async getMealsByCampus(campusId) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_MEALS).filter(m => m.campusId === campusId);
+    }
+    const q = query(collection(db, 'meals'), where('campusId', '==', campusId));
+    const snap = await getDocs(q);
+    return mapSnap(snap);
   },
 
-  addMeal(meal) {
-    const meals = this.getMeals();
+  async addMeal(meal) {
+    await dbReady;
     
-    // Determine budget tags based on price
     const tags = [];
     if (meal.price < 50) tags.push('under-50');
     else if (meal.price <= 75) tags.push('50-75');
@@ -102,194 +175,315 @@ export const dbService = {
 
     const newMeal = {
       ...meal,
-      id: meal.id || `meal-${Date.now()}`,
-      rating: 5.0, // default new meal rating
+      rating: 5.0,
       reviewsCount: 0,
       lastUpdated: new Date().toISOString(),
       tags
     };
 
-    meals.push(newMeal);
-    writeStorage(KEY_MEALS, meals);
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      const meals = readStorage(KEY_MEALS);
+      const createdMeal = { ...newMeal, id: meal.id || `meal-${Date.now()}` };
+      meals.push(createdMeal);
+      writeStorage(KEY_MEALS, meals);
 
-    // Update food stall's menu item list
-    const stalls = this.getStalls();
-    const stallIdx = stalls.findIndex(s => s.id === meal.stallId);
-    if (stallIdx !== -1) {
-      stalls[stallIdx].menuItemIds.push(newMeal.id);
-      writeStorage(KEY_STALLS, stalls);
+      // Update stall
+      const stalls = readStorage(KEY_STALLS);
+      const stallIdx = stalls.findIndex(s => s.id === meal.stallId);
+      if (stallIdx !== -1) {
+        stalls[stallIdx].menuItemIds.push(createdMeal.id);
+        writeStorage(KEY_STALLS, stalls);
+      }
+      return createdMeal;
     }
 
-    return newMeal;
+    const docRef = await addDoc(collection(db, 'meals'), newMeal);
+    
+    const stallRef = doc(db, 'stalls', meal.stallId);
+    const stallSnap = await getDoc(stallRef);
+    if (stallSnap.exists()) {
+      const stallData = stallSnap.data();
+      const menuIds = stallData.menuItemIds || [];
+      await updateDoc(stallRef, {
+        menuItemIds: [...menuIds, docRef.id]
+      });
+    }
+
+    return { id: docRef.id, ...newMeal };
   },
 
-  updateMealPrice(mealId, newPrice, userId, userName) {
-    const meals = this.getMeals();
-    const idx = meals.findIndex(m => m.id === mealId);
-    if (idx === -1) return undefined;
-
-    const oldPrice = meals[idx].price;
-    meals[idx].price = newPrice;
-    meals[idx].lastUpdated = new Date().toISOString();
+  async updateMealPrice(mealId, newPrice, userId, userName) {
+    await dbReady;
     
-    // Recalculate tags
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      const meals = readStorage(KEY_MEALS);
+      const idx = meals.findIndex(m => m.id === mealId);
+      if (idx === -1) return null;
+
+      const oldPrice = meals[idx].price;
+      meals[idx].price = newPrice;
+      meals[idx].lastUpdated = new Date().toISOString();
+      
+      const tags = [];
+      if (newPrice < 50) tags.push('under-50');
+      else if (newPrice <= 75) tags.push('50-75');
+      else if (newPrice <= 100) tags.push('75-100');
+      else tags.push('above-100');
+      meals[idx].tags = tags;
+
+      writeStorage(KEY_MEALS, meals);
+
+      await this.addContribution({
+        userId,
+        userName,
+        type: 'price_update',
+        details: `Updated ${meals[idx].name} price from ₱${oldPrice} to ₱${newPrice}`
+      });
+      return meals[idx];
+    }
+
+    const docRef = doc(db, 'meals', mealId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+
+    const mealData = snap.data();
+    const oldPrice = mealData.price;
+
     const tags = [];
     if (newPrice < 50) tags.push('under-50');
     else if (newPrice <= 75) tags.push('50-75');
     else if (newPrice <= 100) tags.push('75-100');
     else tags.push('above-100');
-    meals[idx].tags = tags;
 
-    writeStorage(KEY_MEALS, meals);
+    await updateDoc(docRef, {
+      price: newPrice,
+      tags,
+      lastUpdated: new Date().toISOString()
+    });
 
-    // Add contribution
-    this.addContribution({
+    await this.addContribution({
       userId,
       userName,
       type: 'price_update',
-      details: `Updated ${meals[idx].name} price from ₱${oldPrice} to ₱${newPrice}`
+      details: `Updated ${mealData.name} price from ₱${oldPrice} to ₱${newPrice}`
     });
 
-    return meals[idx];
+    return { id: mealId, ...mealData, price: newPrice, tags };
   },
 
   // Food Stalls
-  getStalls() {
-    return readStorage(KEY_STALLS);
+  async getStalls() {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_STALLS);
+    }
+    const snap = await getDocs(collection(db, 'stalls'));
+    return mapSnap(snap);
   },
 
-  getStallById(id) {
-    return this.getStalls().find(s => s.id === id);
+  async getStallById(id) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_STALLS).find(s => s.id === id) || null;
+    }
+    const docRef = doc(db, 'stalls', id);
+    const snap = await getDoc(docRef);
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
   },
 
-  getStallsByCampus(campusId) {
-    return this.getStalls().filter(s => s.campusId === campusId);
+  async getStallsByCampus(campusId) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_STALLS).filter(s => s.campusId === campusId);
+    }
+    const q = query(collection(db, 'stalls'), where('campusId', '==', campusId));
+    const snap = await getDocs(q);
+    return mapSnap(snap);
   },
 
-  addStall(stall) {
-    const stalls = this.getStalls();
+  async addStall(stall) {
+    await dbReady;
+    
     const newStall = {
       ...stall,
-      id: stall.id || `stall-${Date.now()}`,
       rating: 5.0,
       reviewsCount: 0,
       menuItemIds: []
     };
-    stalls.push(newStall);
-    writeStorage(KEY_STALLS, stalls);
-    return newStall;
+
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      const stalls = readStorage(KEY_STALLS);
+      const createdStall = { ...newStall, id: stall.id || `stall-${Date.now()}` };
+      stalls.push(createdStall);
+      writeStorage(KEY_STALLS, stalls);
+      return createdStall;
+    }
+
+    const docRef = await addDoc(collection(db, 'stalls'), newStall);
+    return { id: docRef.id, ...newStall };
   },
 
   // Reviews
-  getReviews(targetId, targetType) {
-    return readStorage(KEY_REVIEWS).filter(
-      r => r.targetId === targetId && r.targetType === targetType
+  async getReviews(targetId, targetType) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      return readStorage(KEY_REVIEWS).filter(
+        r => r.targetId === targetId && r.targetType === targetType
+      );
+    }
+    const q = query(
+      collection(db, 'reviews'), 
+      where('targetId', '==', targetId), 
+      where('targetType', '==', targetType)
     );
+    const snap = await getDocs(q);
+    return mapSnap(snap);
   },
 
-  addReview(review) {
-    const reviews = readStorage(KEY_REVIEWS);
+  async addReview(review) {
+    await dbReady;
+    
     const newReview = {
       ...review,
-      id: review.id || `rev-${Date.now()}`,
       createdAt: new Date().toISOString()
     };
-    reviews.push(newReview);
-    writeStorage(KEY_REVIEWS, reviews);
 
-    // Update average ratings
-    if (review.targetType === 'meal') {
-      const meals = this.getMeals();
-      const idx = meals.findIndex(m => m.id === review.targetId);
-      if (idx !== -1) {
-        const mealReviews = reviews.filter(r => r.targetId === review.targetId && r.targetType === 'meal');
-        const avg = mealReviews.reduce((sum, r) => sum + r.rating, 0) / mealReviews.length;
-        meals[idx].rating = parseFloat(avg.toFixed(1));
-        meals[idx].reviewsCount = mealReviews.length;
-        writeStorage(KEY_MEALS, meals);
+    if (useLocalStorageFallback) {
+      initializeLocalStorage();
+      const reviews = readStorage(KEY_REVIEWS);
+      const createdReview = { ...newReview, id: review.id || `rev-${Date.now()}` };
+      reviews.push(createdReview);
+      writeStorage(KEY_REVIEWS, reviews);
 
-        // Also refresh Stall overall rating based on its meals
-        const stallId = meals[idx].stallId;
-        const stallMeals = meals.filter(m => m.stallId === stallId);
-        const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
-        if (ratedMeals.length > 0) {
-          const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
-          const stalls = this.getStalls();
-          const sIdx = stalls.findIndex(s => s.id === stallId);
-          if (sIdx !== -1) {
-            stalls[sIdx].rating = parseFloat(stallAvg.toFixed(1));
-            stalls[sIdx].reviewsCount = ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0);
-            writeStorage(KEY_STALLS, stalls);
+      // Update averages locally
+      if (review.targetType === 'meal') {
+        const meals = readStorage(KEY_MEALS);
+        const idx = meals.findIndex(m => m.id === review.targetId);
+        if (idx !== -1) {
+          const mealReviews = reviews.filter(r => r.targetId === review.targetId && r.targetType === 'meal');
+          const avg = mealReviews.reduce((sum, r) => sum + r.rating, 0) / mealReviews.length;
+          meals[idx].rating = parseFloat(avg.toFixed(1));
+          meals[idx].reviewsCount = mealReviews.length;
+          writeStorage(KEY_MEALS, meals);
+
+          const stallId = meals[idx].stallId;
+          const stallMeals = meals.filter(m => m.stallId === stallId);
+          const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
+          if (ratedMeals.length > 0) {
+            const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
+            const stalls = readStorage(KEY_STALLS);
+            const sIdx = stalls.findIndex(s => s.id === stallId);
+            if (sIdx !== -1) {
+              stalls[sIdx].rating = parseFloat(stallAvg.toFixed(1));
+              stalls[sIdx].reviewsCount = ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0);
+              writeStorage(KEY_STALLS, stalls);
+            }
           }
         }
       }
-    } else {
-      // Direct Stall Review
-      const stalls = this.getStalls();
-      const idx = stalls.findIndex(s => s.id === review.targetId);
-      if (idx !== -1) {
-        const stallReviews = reviews.filter(r => r.targetId === review.targetId && r.targetType === 'stall');
-        const avg = stallReviews.reduce((sum, r) => sum + r.rating, 0) / stallReviews.length;
-        stalls[idx].rating = parseFloat(avg.toFixed(1));
-        stalls[idx].reviewsCount = stallReviews.length;
-        writeStorage(KEY_STALLS, stalls);
-      }
+      return createdReview;
     }
 
-    // Add contribution
-    const targetName = review.targetType === 'meal' 
-      ? this.getMealById(review.targetId)?.name || 'a meal'
-      : this.getStallById(review.targetId)?.name || 'a food stall';
-      
-    this.addContribution({
-      userId: review.userId,
-      userName: review.userName,
-      type: 'add_review',
-      details: `Wrote a review for ${targetName}`
-    });
+    const docRef = await addDoc(collection(db, 'reviews'), newReview);
 
-    return newReview;
-  },
+    // Refresh averages in Firestore
+    if (review.targetType === 'meal') {
+      const mealRef = doc(db, 'meals', review.targetId);
+      const mealSnap = await getDoc(mealRef);
+      if (mealSnap.exists()) {
+        const mealData = mealSnap.data();
+        const q = query(
+          collection(db, 'reviews'),
+          where('targetId', '==', review.targetId),
+          where('targetType', '==', 'meal')
+        );
+        const allReviewsSnap = await getDocs(q);
+        const list = mapSnap(allReviewsSnap);
+        const avg = list.reduce((sum, r) => sum + r.rating, 0) / list.length;
+        await updateDoc(mealRef, {
+          rating: parseFloat(avg.toFixed(1)),
+          reviewsCount: list.length
+        });
 
-  // Contributions
-  getContributions() {
-    return readStorage(KEY_CONTRIBUTIONS).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  },
-
-  getContributionsByUser(userId) {
-    return this.getContributions().filter(c => c.userId === userId);
-  },
-
-  addContribution(contribution) {
-    const list = this.getContributions();
-    const newContrib = {
-      ...contribution,
-      id: `contrib-${Date.now()}`,
-      createdAt: new Date().toISOString()
-    };
-    list.unshift(newContrib);
-    writeStorage(KEY_CONTRIBUTIONS, list);
-
-    // Update user contributions count if active
-    const userSession = localStorage.getItem('ub_user_session');
-    if (userSession) {
-      const user = JSON.parse(userSession);
-      if (user.id === contribution.userId) {
-        user.contributionsCount = (user.contributionsCount || 0) + 1;
-        localStorage.setItem('ub_user_session', JSON.stringify(user));
-        
-        // Also update in registered users list
-        const users = JSON.parse(localStorage.getItem('ub_users') || '[]');
-        const uIdx = users.findIndex((u) => u.id === user.id);
-        if (uIdx !== -1) {
-          users[uIdx].contributionsCount = user.contributionsCount;
-          localStorage.setItem('ub_users', JSON.stringify(users));
+        const stallRef = doc(db, 'stalls', mealData.stallId);
+        const stallSnap = await getDoc(stallRef);
+        if (stallSnap.exists()) {
+          const mealsSnap = await getDocs(collection(db, 'meals'));
+          const allMeals = mapSnap(mealsSnap);
+          const stallMeals = allMeals.filter(m => m.stallId === mealData.stallId);
+          const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
+          if (ratedMeals.length > 0) {
+            const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
+            await updateDoc(stallRef, {
+              rating: parseFloat(stallAvg.toFixed(1)),
+              reviewsCount: ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0)
+            });
+          }
         }
       }
     }
 
-    return newContrib;
+    return { id: docRef.id, ...newReview };
+  },
+
+  // Contributions
+  async getContributions() {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      return readStorage(KEY_CONTRIBUTIONS).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+    const q = query(collection(db, 'contributions'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return mapSnap(snap);
+  },
+
+  async getContributionsByUser(userId) {
+    await dbReady;
+    if (useLocalStorageFallback) {
+      return this.getContributions().then(list => list.filter(c => c.userId === userId));
+    }
+    const q = query(
+      collection(db, 'contributions'), 
+      where('userId', '==', userId), 
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return mapSnap(snap);
+  },
+
+  async addContribution(contribution) {
+    await dbReady;
+    const newContrib = {
+      ...contribution,
+      createdAt: new Date().toISOString()
+    };
+
+    if (useLocalStorageFallback) {
+      const list = readStorage(KEY_CONTRIBUTIONS);
+      const createdContrib = { ...newContrib, id: `contrib-${Date.now()}` };
+      list.unshift(createdContrib);
+      writeStorage(KEY_CONTRIBUTIONS, list);
+      return createdContrib;
+    }
+
+    const docRef = await addDoc(collection(db, 'contributions'), newContrib);
+    const userRef = doc(db, 'users', contribution.userId);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      await updateDoc(userRef, {
+        contributionsCount: (userData.contributionsCount || 0) + 1
+      });
+    }
+    return { id: docRef.id, ...newContrib };
   }
 };

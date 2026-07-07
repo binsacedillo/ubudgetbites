@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, FilterX, Plus, RefreshCw } from 'lucide-react';
 import { CAMPUSES, CATEGORIES, BUDGET_TIERS } from '../constants';
@@ -15,10 +15,29 @@ export const Home = () => {
   const [selectedCampus, setSelectedCampus] = useState('ust'); // Default to UST for demo
   const [selectedBudget, setSelectedBudget] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [meals, setMeals] = useState([]);
+  const [contributions, setContributions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch all meals and active filter checks
-  const meals = useMemo(() => dbService.getMeals(), []);
-  const contributions = useMemo(() => dbService.getContributions().slice(0, 3), []);
+  // Fetch all meals and active contributions
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [fetchedMeals, fetchedContribs] = await Promise.all([
+          dbService.getMeals(),
+          dbService.getContributions()
+        ]);
+        setMeals(fetchedMeals);
+        setContributions(fetchedContribs.slice(0, 3));
+      } catch (err) {
+        console.error("Error fetching data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const filteredMeals = useMemo(() => {
     return meals.filter((meal) => {
@@ -181,8 +200,14 @@ export const Home = () => {
             </h3>
           </div>
 
-          {/* Results Grid */}
-          {filteredMeals.length > 0 ? (
+          {/* Results Grid / Loading State */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="flat-card rounded-xl h-60 shimmer" />
+              ))}
+            </div>
+          ) : filteredMeals.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {filteredMeals.map((meal) => (
                 <div key={meal.id} className="animate-scale-in">
@@ -231,7 +256,9 @@ export const Home = () => {
               </span>
             </div>
             <div className="flex flex-col gap-4">
-              {contributions.map((c) => (
+              {loading ? (
+                <div className="h-20 shimmer rounded-xl" />
+              ) : contributions.map((c) => (
                 <div key={c.id} className="flex gap-3 items-start text-xs">
                   <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs uppercase shrink-0">
                     {c.userName.charAt(0)}

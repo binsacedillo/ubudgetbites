@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Utensils, Store, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,17 +11,30 @@ export const Favorites = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('meals');
 
-  // Load user's favorites from DB
-  const favoriteMeals = useMemo(() => {
-    if (!user || !user.favorites || !user.favorites.meals) return [];
-    const allMeals = dbService.getMeals();
-    return allMeals.filter((m) => user.favorites.meals.includes(m.id));
-  }, [user]);
+  const [favoriteMeals, setFavoriteMeals] = useState([]);
+  const [favoriteStalls, setFavoriteStalls] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const favoriteStalls = useMemo(() => {
-    if (!user || !user.favorites || !user.favorites.stalls) return [];
-    const allStalls = dbService.getStalls();
-    return allStalls.filter((s) => user.favorites.stalls.includes(s.id));
+  useEffect(() => {
+    if (!user) return;
+    const loadFavorites = async () => {
+      setLoading(true);
+      try {
+        const [allMeals, allStalls] = await Promise.all([
+          dbService.getMeals(),
+          dbService.getStalls()
+        ]);
+        const userMeals = user.favorites?.meals || [];
+        const userStalls = user.favorites?.stalls || [];
+        setFavoriteMeals(allMeals.filter((m) => userMeals.includes(m.id)));
+        setFavoriteStalls(allStalls.filter((s) => userStalls.includes(s.id)));
+      } catch (err) {
+        console.error("Error loading favorites:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadFavorites();
   }, [user]);
 
   if (!user) {

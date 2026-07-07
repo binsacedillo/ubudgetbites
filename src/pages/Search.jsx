@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search as SearchIcon, MapPin, Store, Utensils, XCircle } from 'lucide-react';
 import { dbService } from '../services/db';
 import { CAMPUSES } from '../constants';
@@ -9,9 +9,30 @@ export const Search = () => {
   const [query, setQuery] = useState('');
   const [campusFilter, setCampusFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('meals');
+  
+  const [meals, setMeals] = useState([]);
+  const [stalls, setStalls] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const meals = useMemo(() => dbService.getMeals(), []);
-  const stalls = useMemo(() => dbService.getStalls(), []);
+  // Fetch meals and stalls
+  useEffect(() => {
+    const loadSearchData = async () => {
+      setLoading(true);
+      try {
+        const [fetchedMeals, fetchedStalls] = await Promise.all([
+          dbService.getMeals(),
+          dbService.getStalls()
+        ]);
+        setMeals(fetchedMeals);
+        setStalls(fetchedStalls);
+      } catch (err) {
+        console.error("Error loading search data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSearchData();
+  }, []);
 
   // Filtered Meals
   const searchedMeals = useMemo(() => {
@@ -118,7 +139,13 @@ export const Search = () => {
       </div>
 
       {/* Render Listings */}
-      {activeTab === 'meals' ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className="flat-card rounded-xl h-60 bg-gray-100 shimmer" />
+          ))}
+        </div>
+      ) : activeTab === 'meals' ? (
         searchedMeals.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {searchedMeals.map((meal) => (

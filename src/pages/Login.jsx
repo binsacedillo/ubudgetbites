@@ -3,19 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Mail, User, GraduationCap, UtensilsCrossed } from 'lucide-react';
+import { Mail, User, GraduationCap, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { CAMPUSES } from '../constants';
 import { Logo } from '../components/ui/Logo';
 
 const loginSchema = zod.object({
-  email: zod.string().email('Please enter a valid student email address')
+  email: zod.string().email('Please enter a valid student email address'),
+  password: zod.string().min(6, 'Password must be at least 6 characters')
 });
 
 const registerSchema = zod.object({
   name: zod.string().min(2, 'Name must be at least 2 characters long'),
   email: zod.string().email('Please enter a valid email address'),
+  password: zod.string().min(6, 'Password must be at least 6 characters'),
   campus: zod.string().min(1, 'Please select your campus')
 });
 
@@ -25,6 +27,7 @@ export const Login = () => {
   const { showToast } = useToast();
   
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // If already logged in, redirect home
   useEffect(() => {
@@ -49,20 +52,30 @@ export const Login = () => {
     resolver: zodResolver(registerSchema)
   });
 
-  const onLogin = (data) => {
-    const success = login(data.email);
-    if (success) {
+  const onLogin = async (data) => {
+    setIsLoading(true);
+    try {
+      await login(data.email, data.password);
       showToast('Successfully logged in!', 'success');
-      navigate(-1); // Back to previous page
-    } else {
-      showToast('Could not log in, try again', 'error');
+      navigate('/');
+    } catch (err) {
+      showToast(err.message || 'Could not log in, try again', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const onRegister = (data) => {
-    register(data.name, data.email, data.campus);
-    showToast('Registration successful! Welcome!', 'success');
-    navigate(-1); // Back to previous page
+  const onRegister = async (data) => {
+    setIsLoading(true);
+    try {
+      await register(data.name, data.email, data.password, data.campus);
+      showToast('Registration successful! Welcome!', 'success');
+      navigate('/');
+    } catch (err) {
+      showToast(err.message || 'Registration failed, try again', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -84,10 +97,11 @@ export const Login = () => {
         {/* Login Form */}
         {!isRegisterMode ? (
           <form onSubmit={handleLoginSubmit(onLogin)} className="flex flex-col gap-4">
+            {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase">Student Email</label>
               <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
-                loginErrors.email ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-amber-400'
+                loginErrors.email ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
               }`}>
                 <Mail size={16} className="text-gray-400 shrink-0" />
                 <input
@@ -102,11 +116,31 @@ export const Login = () => {
               )}
             </div>
 
+            {/* Password */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
+              <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
+                loginErrors.password ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
+              }`}>
+                <Lock size={16} className="text-gray-400 shrink-0" />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  {...loginRegister('password')}
+                  className="bg-transparent border-none outline-none w-full text-sm font-semibold text-gray-800 placeholder-gray-400"
+                />
+              </div>
+              {loginErrors.password && (
+                <span className="text-xs text-rose-500 font-semibold">{loginErrors.password.message}</span>
+              )}
+            </div>
+
             <button
               type="submit"
-              className="w-full mt-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm shadow-md shadow-amber-500/10 hover:scale-[1.01] transition-transform cursor-pointer"
+              disabled={isLoading}
+              className="w-full mt-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              Sign In
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
         ) : (
@@ -116,7 +150,7 @@ export const Login = () => {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase">Full Name</label>
               <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
-                registerErrors.name ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-amber-400'
+                registerErrors.name ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
               }`}>
                 <User size={16} className="text-gray-400 shrink-0" />
                 <input
@@ -135,7 +169,7 @@ export const Login = () => {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase">Student Email</label>
               <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
-                registerErrors.email ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-amber-400'
+                registerErrors.email ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
               }`}>
                 <Mail size={16} className="text-gray-400 shrink-0" />
                 <input
@@ -150,11 +184,30 @@ export const Login = () => {
               )}
             </div>
 
+            {/* Password */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase">Create Password</label>
+              <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
+                registerErrors.password ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
+              }`}>
+                <Lock size={16} className="text-gray-400 shrink-0" />
+                <input
+                  type="password"
+                  placeholder="At least 6 characters"
+                  {...registerField('password')}
+                  className="bg-transparent border-none outline-none w-full text-sm font-semibold text-gray-800 placeholder-gray-400"
+                />
+              </div>
+              {registerErrors.password && (
+                <span className="text-xs text-rose-500 font-semibold">{registerErrors.password.message}</span>
+              )}
+            </div>
+
             {/* Campus */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-gray-500 uppercase">Your University</label>
               <div className={`flex items-center gap-3 bg-gray-50 border rounded-xl px-4 py-3 transition-colors ${
-                registerErrors.campus ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-amber-400'
+                registerErrors.campus ? 'border-rose-300 bg-rose-50/20' : 'border-gray-100 focus-within:border-orange-400'
               }`}>
                 <GraduationCap size={16} className="text-gray-400 shrink-0" />
                 <select
@@ -176,9 +229,10 @@ export const Login = () => {
 
             <button
               type="submit"
-              className="w-full mt-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-sm shadow-md shadow-amber-500/10 hover:scale-[1.01] transition-transform cursor-pointer"
+              disabled={isLoading}
+              className="w-full mt-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              Register & Start
+              {isLoading ? 'Registering...' : 'Register & Start'}
             </button>
           </form>
         )}
@@ -190,7 +244,7 @@ export const Login = () => {
           </p>
           <button
             onClick={() => setIsRegisterMode(!isRegisterMode)}
-            className="text-xs font-extrabold text-amber-600 hover:text-amber-700 mt-1 cursor-pointer hover:underline uppercase tracking-wide"
+            className="text-xs font-extrabold text-orange-600 hover:text-orange-700 mt-1 cursor-pointer hover:underline uppercase tracking-wide"
           >
             {isRegisterMode ? 'Sign in with existing email' : 'Create an account'}
           </button>

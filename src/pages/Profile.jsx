@@ -1,26 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as zod from 'zod';
-import { LogOut, Award, PlusCircle, CheckCircle } from 'lucide-react';
+import { LogOut, Award, CheckCircle, PlusCircle } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { dbService } from '../services/db';
-import { CATEGORIES, CAMPUSES } from '../constants';
 import { getCampusStyle } from '../utils/theme';
-
-const mealSchema = zod.object({
-  name: zod.string().min(2, 'Meal name must be at least 2 characters'),
-  price: zod.preprocess(
-    (val) => Number(val),
-    zod.number().min(1, 'Price must be greater than 0')
-  ),
-  description: zod.string().min(5, 'Please provide a short description (at least 5 characters)'),
-  category: zod.string().min(1, 'Please select a food category'),
-  stallId: zod.string().min(1, 'Please select a food stall'),
-  campusId: zod.string().min(1, 'Please select a campus')
-});
+import { ShareDealModal } from '../components/ui/ShareDealModal';
 
 export const Profile = () => {
   const navigate = useNavigate();
@@ -28,33 +15,42 @@ export const Profile = () => {
   const { showToast } = useToast();
 
   const [showAddMealModal, setShowAddMealModal] = useState(false);
-
-  // Load user data
-  const stalls = useMemo(() => dbService.getStalls(), []);
-  const contributions = useMemo(() => {
-    if (!user) return [];
-    return dbService.getContributionsByUser(user.id);
-  }, [user]);
-
-  const campusData = useMemo(() => {
-    if (!user) return null;
-    return dbService.getCampusById(user.campus);
-  }, [user]);
-
-  const {
-    register: mealRegister,
-    handleSubmit: handleMealSubmit,
-    reset: resetMealForm,
-    formState: { errors: mealErrors }
-  } = useForm({
-    resolver: zodResolver(mealSchema)
-  });
+  const [stalls, setStalls] = useState([]);
+  const [contributions, setContributions] = useState([]);
+  const [campusData, setCampusData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     if (!user) {
       navigate('/login');
+      return;
     }
+    const loadProfileData = async () => {
+      setLoading(true);
+      try {
+        const [fetchedStalls, fetchedContribs] = await Promise.all([
+          dbService.getStalls(),
+          dbService.getContributionsByUser(user.id)
+        ]);
+        setStalls(fetchedStalls);
+        setContributions(fetchedContribs);
+        const campus = dbService.getCampusById(user.campus);
+        setCampusData(campus);
+      } catch (err) {
+        console.error("Error loading profile details:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfileData();
   }, [user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="pb-24 pt-12 px-4 text-center max-w-sm mx-auto flex flex-col items-center justify-center shimmer rounded-2xl h-60 mt-6" />
+    );
+  }
 
   if (!user) {
     return null;
@@ -66,54 +62,68 @@ export const Profile = () => {
     navigate('/');
   };
 
-  const onAddMeal = (data) => {
+  const onAddMeal = async (data, imageFile) => {
     const selectedStall = stalls.find(s => s.id === data.stallId);
     if (!selectedStall) {
       showToast('Stall not found', 'error');
       return;
     }
 
-    // Unsplash food images map
-    let fallbackImage = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80';
+    setIsAdding(true);
+    let finalImageUrl = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80';
+    
     if (data.category.toLowerCase().includes('rice')) {
-      fallbackImage = 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop&q=80';
+      finalImageUrl = 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop&q=80';
     } else if (data.category.toLowerCase().includes('drink')) {
-      fallbackImage = 'https://images.unsplash.com/photo-1497534446932-c925b458314e?w=600&auto=format&fit=crop&q=80';
+      finalImageUrl = 'https://images.unsplash.com/photo-1497534446932-c925b458314e?w=600&auto=format&fit=crop&q=80';
     } else if (data.category.toLowerCase().includes('noodle')) {
-      fallbackImage = 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=600&auto=format&fit=crop&q=80';
+      finalImageUrl = 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=600&auto=format&fit=crop&q=80';
     } else if (data.category.toLowerCase().includes('sandwich') || data.category.toLowerCase().includes('bakery')) {
-      fallbackImage = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
+      finalImageUrl = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80';
     }
 
-    dbService.addMeal({
-      name: data.name,
-      price: data.price,
-      description: data.description,
-      category: data.category,
-      stallId: data.stallId,
-      stallName: selectedStall.name,
-      campusId: data.campusId,
-      image: fallbackImage
-    });
+    try {
+      if (imageFile) {
+        const fileRef = ref(storage, `meals/${Date.now()}_${imageFile.name}`);
+        const uploadSnap = await uploadBytes(fileRef, imageFile);
+        finalImageUrl = await getDownloadURL(uploadSnap.ref);
+      }
 
-    // Add contribution log
-    dbService.addContribution({
-      userId: user.id,
-      userName: user.name,
-      type: 'add_meal',
-      details: `Added new budget deal: ${data.name} for ₱${data.price}`
-    });
+      await dbService.addMeal({
+        name: data.name,
+        price: data.price,
+        description: data.description,
+        category: data.category,
+        stallId: data.stallId,
+        stallName: selectedStall.name,
+        campusId: data.campusId,
+        image: finalImageUrl
+      });
 
-    resetMealForm();
-    setShowAddMealModal(false);
-    showToast('Budget meal successfully shared with the community!', 'success');
-    
-    // Refresh page / state
-    navigate('/');
+      await dbService.addContribution({
+        userId: user.id,
+        userName: user.name,
+        type: 'add_meal',
+        details: `Added new budget deal: ${data.name} for ₱${data.price}`
+      });
+
+      setShowAddMealModal(false);
+      showToast('Budget meal successfully shared with the community!', 'success');
+
+      // Refresh local list
+      const fetchedContribs = await dbService.getContributionsByUser(user.id);
+      setContributions(fetchedContribs);
+    } catch (err) {
+      console.error("Error adding budget meal:", err);
+      showToast(err.message || 'Failed to upload and add meal', 'error');
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto animate-fade-in-up">
+    <>
+      <div className="pb-24 pt-4 px-4 md:px-8 max-w-4xl mx-auto animate-fade-in-up">
       {/* Profile Header Cards */}
       <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-xs mb-6 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex flex-col md:flex-row items-center gap-5 text-center md:text-left">
@@ -216,139 +226,16 @@ export const Profile = () => {
           )}
         </div>
       </div>
-
+      </div> {/* Closes the animate-fade-in-up page wrapper */}
+      
       {/* SHARE NEW BUDGET DEAL MODAL */}
-      {showAddMealModal && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setShowAddMealModal(false)} />
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-gray-200 shadow-2xl relative z-10 animate-scale-in max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-base text-gray-900 mb-1">Share Budget Deal</h3>
-            <p className="text-xs text-gray-400 font-semibold mb-5 leading-normal">
-              Contribute a local meal Deal so students can find it instantly.
-            </p>
-
-            <form onSubmit={handleMealSubmit(onAddMeal)} className="flex flex-col gap-4">
-              {/* Meal Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Meal / Item Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Pork Siomai Rice"
-                  {...mealRegister('name')}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 outline-none focus:border-orange-400 transition-colors"
-                />
-                {mealErrors.name && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.name.message}</span>
-                )}
-              </div>
-
-              {/* Price */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Price (PHP)</label>
-                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                  <span className="font-bold text-orange-500 text-xs">₱</span>
-                  <input
-                    type="number"
-                    placeholder="e.g. 55"
-                    {...mealRegister('price')}
-                    className="bg-transparent border-none outline-none w-full text-xs font-semibold text-gray-800"
-                  />
-                </div>
-                {mealErrors.price && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.price.message}</span>
-                )}
-              </div>
-
-              {/* Campus Selector */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Campus Proximity</label>
-                <select
-                  {...mealRegister('campusId')}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-orange-400 cursor-pointer"
-                >
-                  <option value="">Select Campus...</option>
-                  {CAMPUSES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                {mealErrors.campusId && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.campusId.message}</span>
-                )}
-              </div>
-
-              {/* Category */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Food Category</label>
-                <select
-                  {...mealRegister('category')}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-orange-400 cursor-pointer"
-                >
-                  <option value="">Select Category...</option>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-                {mealErrors.category && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.category.message}</span>
-                )}
-              </div>
-
-              {/* Food Stall */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Food Stall</label>
-                <select
-                  {...mealRegister('stallId')}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-orange-400 cursor-pointer"
-                >
-                  <option value="">Select Food Stall...</option>
-                  {stalls.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({CAMPUSES.find(c => c.id === s.campusId)?.name})
-                    </option>
-                  ))}
-                </select>
-                {mealErrors.stallId && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.stallId.message}</span>
-                )}
-              </div>
-
-              {/* Description */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Short description</label>
-                <textarea
-                  placeholder="Where is the stall? What's inside the meal? e.g., 4 pieces of pork siomai, sweet chili sauce, Asturias side"
-                  rows={2}
-                  {...mealRegister('description')}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-semibold text-gray-800 outline-none focus:border-orange-400 resize-none"
-                />
-                {mealErrors.description && (
-                  <span className="text-[10px] text-rose-500 font-bold">{mealErrors.description.message}</span>
-                )}
-              </div>
-
-              <div className="flex gap-2.5 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddMealModal(false)}
-                  className="flex-1 py-2.5 rounded-lg border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-lg bg-orange-500 text-white font-bold text-xs cursor-pointer"
-                >
-                  Add Meal
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <ShareDealModal 
+        isOpen={showAddMealModal}
+        onClose={() => setShowAddMealModal(false)}
+        stalls={stalls}
+        onSubmit={onAddMeal}
+        isAdding={isAdding}
+      />
+    </>
   );
 };
