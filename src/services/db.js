@@ -84,11 +84,10 @@ async function initializeDB() {
     }
   } catch (error) {
     console.error('Error initializing Firestore:', error);
-    useLocalStorageFallback = true;
   }
 }
 
-// Timeout failsafe (4.5 seconds)
+// Failsafe: Fallback to LocalStorage if Firestore takes longer than 10 seconds (e.g. blocked by school Wi-Fi)
 const timeoutPromise = new Promise((resolve) => {
   setTimeout(() => {
     if (!useLocalStorageFallback) {
@@ -96,12 +95,13 @@ const timeoutPromise = new Promise((resolve) => {
       useLocalStorageFallback = true;
     }
     resolve();
-  }, 4500);
+  }, 10000);
 });
 
 export const dbReady = Promise.race([
   initializeDB().then(() => {
     console.log("Firebase connected successfully.");
+    useLocalStorageFallback = false; // Ensure we use live DB once connected
   }),
   timeoutPromise
 ]);
