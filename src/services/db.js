@@ -3,50 +3,42 @@ import {
   doc, 
   getDoc, 
   getDocs, 
-  setDoc, 
   addDoc, 
   updateDoc, 
   query, 
   where, 
   orderBy, 
-  limit, 
   writeBatch 
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { CAMPUSES, FOOD_STALLS, MEALS, REVIEWS } from '../constants';
+import { dbFallbackService } from './dbFallback';
 
-// LocalStorage Keys for fallback
-const KEY_MEALS = 'ub_meals';
-const KEY_STALLS = 'ub_stalls';
-const KEY_REVIEWS = 'ub_reviews';
-const KEY_CONTRIBUTIONS = 'ub_contributions';
+// Local assets mapping to resolve dev paths in production
+import siomaiRiceImg from '../assets/steamed_pork_siomai_rice.png';
+import lugawWithEggImg from '../assets/special_lugaw_with_egg.png';
+import sizzlingBurgerSteakImg from '../assets/sizzling_burger_steak.png';
+import crispyChickenRiceImg from '../assets/crispy_chicken_rice.png';
+import dimsumTreatsStallImg from '../assets/dimsum_treats_stall.png';
+
+const localAssetMap = {
+  '/src/assets/steamed_pork_siomai_rice.png': siomaiRiceImg,
+  '/src/assets/special_lugaw_with_egg.png': lugawWithEggImg,
+  '/src/assets/sizzling_burger_steak.png': sizzlingBurgerSteakImg,
+  '/src/assets/crispy_chicken_rice.png': crispyChickenRiceImg,
+  '/src/assets/dimsum_treats_stall.png': dimsumTreatsStallImg,
+};
 
 let useLocalStorageFallback = false;
 
 // Helper to convert Firestore snapshots to plain arrays
-const mapSnap = (snap) => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-// LocalStorage Fallback Helpers
-function readStorage(key, defaultVal = []) {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultVal;
-}
-
-function writeStorage(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
-function initializeLocalStorage() {
-  if (!localStorage.getItem(KEY_STALLS)) {
-    localStorage.setItem(KEY_STALLS, JSON.stringify(FOOD_STALLS));
+const mapSnap = (snap) => snap.docs.map(doc => {
+  const data = doc.data();
+  if (data.image && localAssetMap[data.image]) {
+    data.image = localAssetMap[data.image];
   }
-  if (!localStorage.getItem(KEY_MEALS)) {
-    localStorage.setItem(KEY_MEALS, JSON.stringify(MEALS));
-  }
-  if (!localStorage.getItem(KEY_REVIEWS)) {
-    localStorage.setItem(KEY_REVIEWS, JSON.stringify(REVIEWS));
-  }
-}
+  return { id: doc.id, ...data };
+});
 
 // Seed database concurrently on first load if empty
 async function initializeDB() {
@@ -92,15 +84,14 @@ async function initializeDB() {
     }
   } catch (error) {
     console.error('Error initializing Firestore:', error);
-    // Fallback immediately on connection/permission errors
     useLocalStorageFallback = true;
   }
 }
 
-// Race database ready with a 2.5 second timeout
+// Timeout failsafe (2.5 seconds)
 const timeoutPromise = new Promise((resolve) => {
   setTimeout(() => {
-    if (loadingStateActive()) {
+    if (!useLocalStorageFallback) {
       console.warn("Firebase initialization timed out. Falling back to local data storage!");
       useLocalStorageFallback = true;
     }
@@ -108,21 +99,47 @@ const timeoutPromise = new Promise((resolve) => {
   }, 2500);
 });
 
-// Helper check to see if database was successfully loaded before timeout
-function loadingStateActive() {
-  return !useLocalStorageFallback;
-}
-
 export const dbReady = Promise.race([
   initializeDB().then(() => {
-    // If completed successfully without throwing
     console.log("Firebase connected successfully.");
   }),
   timeoutPromise
 ]);
 
+// Rating aggregations helper
+async function recalculateMealRatings(mealId) {
+  const mealRef = doc(db, 'meals', mealId);
+  const q = query(
+    collection(db, 'reviews'),
+    where('targetId', '==', mealId),
+    where('targetType', '==', 'meal')
+  );
+  const snap = await getDocs(q);
+  const list = mapSnap(snap);
+  const avg = list.reduce((sum, r) => sum + r.rating, 0) / list.length;
+  await updateDoc(mealRef, {
+    rating: parseFloat(avg.toFixed(1)),
+    reviewsCount: list.length
+  });
+}
+
+async function recalculateStallRatings(stallId) {
+  const stallRef = doc(db, 'stalls', stallId);
+  const snap = await getDocs(collection(db, 'meals'));
+  const allMeals = mapSnap(snap);
+  const stallMeals = allMeals.filter(m => m.stallId === stallId);
+  const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
+  
+  if (ratedMeals.length > 0) {
+    const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
+    await updateDoc(stallRef, {
+      rating: parseFloat(stallAvg.toFixed(1)),
+      reviewsCount: ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0)
+    });
+  }
+}
+
 export const dbService = {
-  // Campuses
   getCampuses() {
     return CAMPUSES;
   },
@@ -134,31 +151,29 @@ export const dbService = {
   // Meals
   async getMeals() {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_MEALS);
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getMeals();
     const snap = await getDocs(collection(db, 'meals'));
     return mapSnap(snap);
   },
 
   async getMealById(id) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_MEALS).find(m => m.id === id) || null;
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getMealById(id);
     const docRef = doc(db, 'meals', id);
     const snap = await getDoc(docRef);
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.image && localAssetMap[data.image]) {
+        data.image = localAssetMap[data.image];
+      }
+      return { id: snap.id, ...data };
+    }
+    return null;
   },
 
   async getMealsByCampus(campusId) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_MEALS).filter(m => m.campusId === campusId);
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getMealsByCampus(campusId);
     const q = query(collection(db, 'meals'), where('campusId', '==', campusId));
     const snap = await getDocs(q);
     return mapSnap(snap);
@@ -166,7 +181,8 @@ export const dbService = {
 
   async addMeal(meal) {
     await dbReady;
-    
+    if (useLocalStorageFallback) return dbFallbackService.addMeal(meal);
+
     const tags = [];
     if (meal.price < 50) tags.push('under-50');
     else if (meal.price <= 75) tags.push('50-75');
@@ -180,23 +196,6 @@ export const dbService = {
       lastUpdated: new Date().toISOString(),
       tags
     };
-
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      const meals = readStorage(KEY_MEALS);
-      const createdMeal = { ...newMeal, id: meal.id || `meal-${Date.now()}` };
-      meals.push(createdMeal);
-      writeStorage(KEY_MEALS, meals);
-
-      // Update stall
-      const stalls = readStorage(KEY_STALLS);
-      const stallIdx = stalls.findIndex(s => s.id === meal.stallId);
-      if (stallIdx !== -1) {
-        stalls[stallIdx].menuItemIds.push(createdMeal.id);
-        writeStorage(KEY_STALLS, stalls);
-      }
-      return createdMeal;
-    }
 
     const docRef = await addDoc(collection(db, 'meals'), newMeal);
     
@@ -215,34 +214,7 @@ export const dbService = {
 
   async updateMealPrice(mealId, newPrice, userId, userName) {
     await dbReady;
-    
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      const meals = readStorage(KEY_MEALS);
-      const idx = meals.findIndex(m => m.id === mealId);
-      if (idx === -1) return null;
-
-      const oldPrice = meals[idx].price;
-      meals[idx].price = newPrice;
-      meals[idx].lastUpdated = new Date().toISOString();
-      
-      const tags = [];
-      if (newPrice < 50) tags.push('under-50');
-      else if (newPrice <= 75) tags.push('50-75');
-      else if (newPrice <= 100) tags.push('75-100');
-      else tags.push('above-100');
-      meals[idx].tags = tags;
-
-      writeStorage(KEY_MEALS, meals);
-
-      await this.addContribution({
-        userId,
-        userName,
-        type: 'price_update',
-        details: `Updated ${meals[idx].name} price from ₱${oldPrice} to ₱${newPrice}`
-      });
-      return meals[idx];
-    }
+    if (useLocalStorageFallback) return dbFallbackService.updateMealPrice(mealId, newPrice, userId, userName);
 
     const docRef = doc(db, 'meals', mealId);
     const snap = await getDoc(docRef);
@@ -276,31 +248,29 @@ export const dbService = {
   // Food Stalls
   async getStalls() {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_STALLS);
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getStalls();
     const snap = await getDocs(collection(db, 'stalls'));
     return mapSnap(snap);
   },
 
   async getStallById(id) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_STALLS).find(s => s.id === id) || null;
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getStallById(id);
     const docRef = doc(db, 'stalls', id);
     const snap = await getDoc(docRef);
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.image && localAssetMap[data.image]) {
+        data.image = localAssetMap[data.image];
+      }
+      return { id: snap.id, ...data };
+    }
+    return null;
   },
 
   async getStallsByCampus(campusId) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_STALLS).filter(s => s.campusId === campusId);
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getStallsByCampus(campusId);
     const q = query(collection(db, 'stalls'), where('campusId', '==', campusId));
     const snap = await getDocs(q);
     return mapSnap(snap);
@@ -308,23 +278,14 @@ export const dbService = {
 
   async addStall(stall) {
     await dbReady;
-    
+    if (useLocalStorageFallback) return dbFallbackService.addStall(stall);
+
     const newStall = {
       ...stall,
       rating: 5.0,
       reviewsCount: 0,
       menuItemIds: []
     };
-
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      const stalls = readStorage(KEY_STALLS);
-      const createdStall = { ...newStall, id: stall.id || `stall-${Date.now()}` };
-      stalls.push(createdStall);
-      writeStorage(KEY_STALLS, stalls);
-      return createdStall;
-    }
-
     const docRef = await addDoc(collection(db, 'stalls'), newStall);
     return { id: docRef.id, ...newStall };
   },
@@ -332,12 +293,7 @@ export const dbService = {
   // Reviews
   async getReviews(targetId, targetType) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      return readStorage(KEY_REVIEWS).filter(
-        r => r.targetId === targetId && r.targetType === targetType
-      );
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getReviews(targetId, targetType);
     const q = query(
       collection(db, 'reviews'), 
       where('targetId', '==', targetId), 
@@ -349,86 +305,56 @@ export const dbService = {
 
   async addReview(review) {
     await dbReady;
-    
+    if (useLocalStorageFallback) return dbFallbackService.addReview(review);
+
     const newReview = {
       ...review,
       createdAt: new Date().toISOString()
     };
-
-    if (useLocalStorageFallback) {
-      initializeLocalStorage();
-      const reviews = readStorage(KEY_REVIEWS);
-      const createdReview = { ...newReview, id: review.id || `rev-${Date.now()}` };
-      reviews.push(createdReview);
-      writeStorage(KEY_REVIEWS, reviews);
-
-      // Update averages locally
-      if (review.targetType === 'meal') {
-        const meals = readStorage(KEY_MEALS);
-        const idx = meals.findIndex(m => m.id === review.targetId);
-        if (idx !== -1) {
-          const mealReviews = reviews.filter(r => r.targetId === review.targetId && r.targetType === 'meal');
-          const avg = mealReviews.reduce((sum, r) => sum + r.rating, 0) / mealReviews.length;
-          meals[idx].rating = parseFloat(avg.toFixed(1));
-          meals[idx].reviewsCount = mealReviews.length;
-          writeStorage(KEY_MEALS, meals);
-
-          const stallId = meals[idx].stallId;
-          const stallMeals = meals.filter(m => m.stallId === stallId);
-          const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
-          if (ratedMeals.length > 0) {
-            const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
-            const stalls = readStorage(KEY_STALLS);
-            const sIdx = stalls.findIndex(s => s.id === stallId);
-            if (sIdx !== -1) {
-              stalls[sIdx].rating = parseFloat(stallAvg.toFixed(1));
-              stalls[sIdx].reviewsCount = ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0);
-              writeStorage(KEY_STALLS, stalls);
-            }
-          }
-        }
-      }
-      return createdReview;
-    }
-
     const docRef = await addDoc(collection(db, 'reviews'), newReview);
 
-    // Refresh averages in Firestore
+    // Recalculate average ratings
     if (review.targetType === 'meal') {
+      await recalculateMealRatings(review.targetId);
       const mealRef = doc(db, 'meals', review.targetId);
       const mealSnap = await getDoc(mealRef);
       if (mealSnap.exists()) {
-        const mealData = mealSnap.data();
+        await recalculateStallRatings(mealSnap.data().stallId);
+      }
+    } else {
+      const stallRef = doc(db, 'stalls', review.targetId);
+      const stallSnap = await getDoc(stallRef);
+      if (stallSnap.exists()) {
         const q = query(
           collection(db, 'reviews'),
           where('targetId', '==', review.targetId),
-          where('targetType', '==', 'meal')
+          where('targetType', '==', 'stall')
         );
         const allReviewsSnap = await getDocs(q);
         const list = mapSnap(allReviewsSnap);
         const avg = list.reduce((sum, r) => sum + r.rating, 0) / list.length;
-        await updateDoc(mealRef, {
+        await updateDoc(stallRef, {
           rating: parseFloat(avg.toFixed(1)),
           reviewsCount: list.length
         });
-
-        const stallRef = doc(db, 'stalls', mealData.stallId);
-        const stallSnap = await getDoc(stallRef);
-        if (stallSnap.exists()) {
-          const mealsSnap = await getDocs(collection(db, 'meals'));
-          const allMeals = mapSnap(mealsSnap);
-          const stallMeals = allMeals.filter(m => m.stallId === mealData.stallId);
-          const ratedMeals = stallMeals.filter(m => m.reviewsCount > 0);
-          if (ratedMeals.length > 0) {
-            const stallAvg = ratedMeals.reduce((sum, m) => sum + m.rating, 0) / ratedMeals.length;
-            await updateDoc(stallRef, {
-              rating: parseFloat(stallAvg.toFixed(1)),
-              reviewsCount: ratedMeals.reduce((sum, m) => sum + m.reviewsCount, 0)
-            });
-          }
-        }
       }
     }
+
+    let targetName = 'Item';
+    if (review.targetType === 'meal') {
+      const meal = await this.getMealById(review.targetId);
+      if (meal) targetName = meal.name;
+    } else {
+      const stall = await this.getStallById(review.targetId);
+      if (stall) targetName = stall.name;
+    }
+
+    await this.addContribution({
+      userId: review.userId,
+      userName: review.userName,
+      type: 'add_review',
+      details: `Wrote a review for ${targetName}`
+    });
 
     return { id: docRef.id, ...newReview };
   },
@@ -436,11 +362,7 @@ export const dbService = {
   // Contributions
   async getContributions() {
     await dbReady;
-    if (useLocalStorageFallback) {
-      return readStorage(KEY_CONTRIBUTIONS).sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getContributions();
     const q = query(collection(db, 'contributions'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
     return mapSnap(snap);
@@ -448,9 +370,7 @@ export const dbService = {
 
   async getContributionsByUser(userId) {
     await dbReady;
-    if (useLocalStorageFallback) {
-      return this.getContributions().then(list => list.filter(c => c.userId === userId));
-    }
+    if (useLocalStorageFallback) return dbFallbackService.getContributionsByUser(userId);
     const q = query(
       collection(db, 'contributions'), 
       where('userId', '==', userId), 
@@ -462,20 +382,14 @@ export const dbService = {
 
   async addContribution(contribution) {
     await dbReady;
+    if (useLocalStorageFallback) return dbFallbackService.addContribution(contribution);
+
     const newContrib = {
       ...contribution,
       createdAt: new Date().toISOString()
     };
-
-    if (useLocalStorageFallback) {
-      const list = readStorage(KEY_CONTRIBUTIONS);
-      const createdContrib = { ...newContrib, id: `contrib-${Date.now()}` };
-      list.unshift(createdContrib);
-      writeStorage(KEY_CONTRIBUTIONS, list);
-      return createdContrib;
-    }
-
     const docRef = await addDoc(collection(db, 'contributions'), newContrib);
+
     const userRef = doc(db, 'users', contribution.userId);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists()) {
@@ -484,6 +398,7 @@ export const dbService = {
         contributionsCount: (userData.contributionsCount || 0) + 1
       });
     }
+
     return { id: docRef.id, ...newContrib };
   }
 };
