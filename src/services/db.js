@@ -56,39 +56,41 @@ async function initializeDB() {
       getDocs(collection(db, 'meals')),
       getDocs(collection(db, 'reviews'))
     ]);
-    
-    const promises = [];
-    
-    if (stallsSnap.empty) {
-      console.log('Seeding Firestore stalls...');
-      const batch = writeBatch(db);
-      FOOD_STALLS.forEach((stall) => {
+
+    const existingStallIds = new Set(stallsSnap.docs.map(d => d.id));
+    const existingMealIds = new Set(mealsSnap.docs.map(d => d.id));
+    const existingReviewIds = new Set(reviewsSnap.docs.map(d => d.id));
+
+    const batch = writeBatch(db);
+    let needsCommit = false;
+
+    FOOD_STALLS.forEach((stall) => {
+      if (!existingStallIds.has(stall.id)) {
+        console.log(`Seeding missing stall to Firestore: ${stall.name}`);
         batch.set(doc(db, 'stalls', stall.id), stall);
-      });
-      promises.push(batch.commit());
-    }
+        needsCommit = true;
+      }
+    });
 
-    if (mealsSnap.empty) {
-      console.log('Seeding Firestore meals...');
-      const batch = writeBatch(db);
-      MEALS.forEach((meal) => {
+    MEALS.forEach((meal) => {
+      if (!existingMealIds.has(meal.id)) {
+        console.log(`Seeding missing meal to Firestore: ${meal.name}`);
         batch.set(doc(db, 'meals', meal.id), meal);
-      });
-      promises.push(batch.commit());
-    }
+        needsCommit = true;
+      }
+    });
 
-    if (reviewsSnap.empty) {
-      console.log('Seeding Firestore reviews...');
-      const batch = writeBatch(db);
-      REVIEWS.forEach((review) => {
+    REVIEWS.forEach((review) => {
+      if (!existingReviewIds.has(review.id)) {
+        console.log(`Seeding missing review to Firestore: ${review.id}`);
         batch.set(doc(db, 'reviews', review.id), review);
-      });
-      promises.push(batch.commit());
-    }
+        needsCommit = true;
+      }
+    });
 
-    if (promises.length > 0) {
-      await Promise.all(promises);
-      console.log('Database successfully seeded!');
+    if (needsCommit) {
+      await batch.commit();
+      console.log('Database successfully synced with new mock data!');
     }
   } catch (error) {
     console.error('Error initializing Firestore:', error);
