@@ -1,4 +1,4 @@
-import { CAMPUSES, FOOD_STALLS, MEALS, REVIEWS } from '../constants';
+import { FOOD_STALLS, MEALS, REVIEWS } from '../constants';
 
 const KEY_MEALS = 'ub_meals';
 const KEY_STALLS = 'ub_stalls';

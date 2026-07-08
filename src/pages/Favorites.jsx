@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Utensils, Store, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,6 @@ export const Favorites = () => {
 
   const [favoriteMeals, setFavoriteMeals] = useState([]);
   const [favoriteStalls, setFavoriteStalls] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
