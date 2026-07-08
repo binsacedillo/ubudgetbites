@@ -20,6 +20,10 @@ import lugawWithEggImg from '../assets/special_lugaw_with_egg.png';
 import sizzlingBurgerSteakImg from '../assets/sizzling_burger_steak.png';
 import crispyChickenRiceImg from '../assets/crispy_chicken_rice.png';
 import dimsumTreatsStallImg from '../assets/dimsum_treats_stall.png';
+import creamyCarbonaraImg from '../assets/creamy_carbonara.png';
+import kwekKwekPlatterImg from '../assets/kwek_kwek_platter.png';
+import icedMilkTeaImg from '../assets/iced_milk_tea.png';
+import cheeseRollsImg from '../assets/cheese_rolls.png';
 
 const localAssetMap = {
   '/src/assets/steamed_pork_siomai_rice.png': siomaiRiceImg,
@@ -27,6 +31,10 @@ const localAssetMap = {
   '/src/assets/sizzling_burger_steak.png': sizzlingBurgerSteakImg,
   '/src/assets/crispy_chicken_rice.png': crispyChickenRiceImg,
   '/src/assets/dimsum_treats_stall.png': dimsumTreatsStallImg,
+  '/src/assets/creamy_carbonara.png': creamyCarbonaraImg,
+  '/src/assets/kwek_kwek_platter.png': kwekKwekPlatterImg,
+  '/src/assets/iced_milk_tea.png': icedMilkTeaImg,
+  '/src/assets/cheese_rolls.png': cheeseRollsImg,
 };
 
 let useLocalStorageFallback = false;
