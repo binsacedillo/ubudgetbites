@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Presentation/Demo documents
+demo_qa.txt
+demo_script.txt
